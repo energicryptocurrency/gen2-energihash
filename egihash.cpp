@@ -11,8 +11,10 @@ extern "C"
 #include <stdint.h>
 #include <algorithm>
 #include <cmath>
+#include <functional>
 #include <iomanip>
 #include <limits>
+#include <map>
 #include <memory>
 #include <stdexcept>
 #include <string>
@@ -245,22 +247,193 @@ namespace
 		}
 	};
 
+	// TODO: unit tests / validation
 	template <typename HashType>
-	typename HashType::deserialized_hash_t hash_words(::std::string data)
+	typename HashType::deserialized_hash_t hash_words(::std::string const & data)
 	{
 		auto const hash = HashType(data);
-		return hash->deserialize();
+		return hash.deserialize();
 	}
+
+	// TODO: unit tests / validation
 	template <typename HashType>
 	typename HashType::deserialized_hash_t hash_words(typename HashType::deserialized_hash_t const & deserialized)
 	{
 		auto const serialized = HashType::serialize(deserialized);
-		return hash_words(serialized);
+		return hash_words<HashType>(serialized);
 	}
 }
 
 namespace egihash
 {
+	// TODO: unit tests / validation
+	template <typename T>
+	sha3_512_t::deserialized_hash_t sha3_512(T const & data)
+	{
+		return hash_words<sha3_512_t>(data);
+	}
+
+	// TODO: unit tests / validation
+	template <typename T>
+	sha3_512_t::deserialized_hash_t sha3_256(T const & data)
+	{
+		return hash_words<sha3_256_t>(data);
+	}
+
+	// TODO: unit tests / validation
+	template <typename T>
+	::std::string serialize_cache(T const & cache_data)
+	{
+		::std::string ret;
+		for (auto const & i : cache_data)
+		{
+			ret += serialize_hash(cache_data);
+		}
+	}
+
+	// TODO: unit tests / validation
+	template <typename T>
+	::std::string serialize_dataset(T const & dataset)
+	{
+		return serialize_cache(dataset);
+	}
+
+	// TODO: unit tests / validation
+	::std::string get_seedhash(size_t const block_number)
+	{
+		::std::string s(32, 0);
+		for (size_t i = 0; i < (block_number / constants::EPOCH_LENGTH); i++)
+		{
+			s = sha3_256_t::serialize(sha3_256(s));
+		}
+		return s;
+	}
+
+	// TODO: unit tests / validation
+	::std::vector<sha3_512_t::deserialized_hash_t> mkcache(size_t const cache_size, ::std::string seed)
+	{
+		size_t n = cache_size / constants::HASH_BYTES;
+
+		::std::vector<sha3_512_t::deserialized_hash_t> o{sha3_512(seed)};
+		for (size_t i = 1; i < n; i++)
+		{
+			o.push_back(sha3_512(o.back()));
+		}
+
+		for (size_t i = 0; i < constants::CACHE_ROUNDS; i++)
+		{
+			for (size_t j = 0; j < n; j++)
+			{
+				auto v = o[j][0] % n;
+				auto & u = o[(j-1+n)%n];
+				size_t count = 0;
+				for (auto & k : u)
+				{
+					count++;
+					k = k ^ o[v][count];
+				}
+				o[i] = sha3_512(u);
+			}
+		}
+
+		return o;
+	}
+
+	// TODO: unit tests / validation
+	sha3_512_t::deserialized_hash_t calc_dataset_item(::std::vector<sha3_512_t::deserialized_hash_t> const & cache, size_t const i)
+	{
+		size_t const n = cache.size();
+		constexpr size_t r = constants::HASH_BYTES / constants::WORD_BYTES;
+		sha3_512_t::deserialized_hash_t mix;
+		std::copy(cache[i%n].begin(), cache[i%n].end(), mix.begin());
+		mix[0] ^= i;
+		mix = sha3_512(mix);
+		for (size_t j = 0; j < constants::DATASET_PARENTS; j++)
+		{
+			size_t const cache_index = fnv(i ^ j, mix[j % r]);
+			auto l = cache[cache_index % n].begin();
+			auto lEnd = cache[cache_index % n].end();
+			for (auto k = mix.begin(), kEnd = mix.end();
+				((k != kEnd) && (l != lEnd)); k++, l++)
+			{
+				*k = fnv(*k, *l);
+			}
+
+		}
+		return sha3_512(mix);
+	}
+
+	// TODO: unit tests / validation
+	::std::vector<sha3_512_t::deserialized_hash_t> calc_dataset(::std::vector<sha3_512_t::deserialized_hash_t> const & cache, size_t const full_size)
+	{
+		::std::vector<sha3_512_t::deserialized_hash_t> out;
+		for (size_t i = 0; i < (full_size / constants::HASH_BYTES); i++)
+		{
+			out.push_back(calc_dataset_item(cache, i));
+		}
+		return out;
+	}
+
+	// TODO: unit tests / validation
+	decltype(auto) hashimoto(sha3_256_t::deserialized_hash_t const & header, uint64_t const nonce, size_t const full_size, ::std::function<sha3_512_t::deserialized_hash_t (size_t const)> lookup)
+	{
+		auto const n = full_size / constants::HASH_BYTES;
+		auto const w = constants::MIX_BYTES / constants::WORD_BYTES;
+		auto const mixhashes = constants::MIX_BYTES / constants::HASH_BYTES;
+
+		sha3_256_t::deserialized_hash_t header_seed(header);
+		for (size_t i = 0; i < 8; i++)
+		{
+			// TODO: nonce is big endian, this converts to little endian (do something sensible for big endian)
+			header_seed.push_back(reinterpret_cast<uint8_t const *>(&nonce)[7 - i]);
+		}
+		auto s = sha3_512(header_seed);
+		decltype(s) mix;
+		for (size_t i = 0; i < (constants::MIX_BYTES / constants::HASH_BYTES); i++)
+		{
+			mix.insert(mix.end(), s.begin(), s.end());
+		}
+
+		for (size_t i = 0; i < constants::ACCESSES; i++)
+		{
+			auto p = fnv(i ^ s[0], mix[i % w]) % (n / mixhashes) * mixhashes;
+			decltype(s) newdata;
+			for (size_t j = 0; j < (constants::MIX_BYTES / constants::HASH_BYTES); j++)
+			{
+				auto const & h = lookup(p + j);
+				newdata.insert(newdata.end(), h.begin(), h.end());
+			}
+			for (auto j = mix.begin(), jEnd = mix.end(), k = newdata.begin(), kEnd = newdata.end(); j != jEnd && k != kEnd; j++, k++)
+			{
+				*j = fnv(*j, *k);
+			}
+		}
+
+		decltype(s) cmix;
+		for (size_t i = 0; i < mix.size(); i += 4)
+		{
+			cmix.push_back(fnv(fnv(fnv(mix[i], mix[i+1]), mix[i+2]), mix[i+3]));
+		}
+
+		::std::map<::std::string, ::std::string> out;
+		out.insert(decltype(out)::value_type(::std::string("mix digest"), sha3_512_t::serialize(cmix)));
+		s.insert(s.end(), cmix.begin(), cmix.end());
+		out.insert(decltype(out)::value_type(::std::string("result"), sha3_256_t::serialize(sha3_256(s))));
+		return out;
+	}
+
+	// TODO: unit tests / validation
+	decltype(auto) hashimoto_light(size_t const full_size, ::std::vector<sha3_512_t::deserialized_hash_t> const cache, sha3_256_t::deserialized_hash_t const & header, uint64_t const nonce)
+	{
+		return hashimoto(header, nonce, full_size, [cache](size_t const x){return calc_dataset_item(cache, x);});
+	}
+
+	// TODO: unit tests / validation
+	decltype(auto) hashimoto_full(size_t const full_size, ::std::vector<sha3_512_t::deserialized_hash_t> const dataset, sha3_256_t::deserialized_hash_t const & header, uint64_t const nonce)
+	{
+		return hashimoto(header, nonce, full_size, [dataset](size_t const x){return dataset[x];});
+	}
+
 	bool test_function()
 	{
 		using namespace std;
