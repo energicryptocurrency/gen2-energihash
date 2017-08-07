@@ -246,13 +246,13 @@ namespace
 	};
 
 	template <typename HashType>
-	::std::string hash_words(::std::string data)
+	typename HashType::deserialized_hash_t hash_words(::std::string data)
 	{
 		auto const hash = HashType(data);
 		return hash->deserialize();
 	}
 	template <typename HashType>
-	::std::string hash_words(typename HashType::deserialized_hash_t const & deserialized)
+	typename HashType::deserialized_hash_t hash_words(typename HashType::deserialized_hash_t const & deserialized)
 	{
 		auto const serialized = HashType::serialize(deserialized);
 		return hash_words(serialized);
