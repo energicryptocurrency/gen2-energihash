@@ -41,8 +41,8 @@ namespace
 		constexpr uint32_t CACHE_ROUNDS = 3u;                     // number of rounds in cache production
 		constexpr uint32_t ACCESSES = 64u;                        // number of accesses in hashimoto loop
 
-		constexpr EGIHASH_NAMESPACE(h256_t) empty_h256 = { {0} };
-		constexpr EGIHASH_NAMESPACE(result_t) empty_result = { {{0}}, {{0}} };
+		constexpr EGIHASH_NAMESPACE(h256_t) empty_h256 = {{0}};
+		constexpr EGIHASH_NAMESPACE(result_t) empty_result = {{{0}}, {{0}}};
 	}
 
 	inline int32_t decode_int(uint8_t const * data, uint8_t const * dataEnd) noexcept
