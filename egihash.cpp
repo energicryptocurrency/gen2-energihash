@@ -518,3 +518,62 @@ namespace egihash
 		return success;
 	}
 }
+
+extern "C"
+{
+	EGIHASH_NAMESPACE(light_t) EGIHASH_NAMESPACE(light_new)(unsigned int number)
+	{
+		// TODO: implement me
+		(void)number;
+		return 0;
+	}
+
+	EGIHASH_NAMESPACE(result_t) EGIHASH_NAMESPACE(light_compute)(EGIHASH_NAMESPACE(light_t) light, EGIHASH_NAMESPACE(h256_t) header_hash, uint64_t nonce)
+	{
+		// TODO: implement me
+		(void)light; (void)header_hash; (void)nonce;
+		EGIHASH_NAMESPACE(result_t) result;
+		return result;
+	}
+
+	void EGIHASH_NAMESPACE(light_delete)(EGIHASH_NAMESPACE(light_t) light)
+	{
+		// TODO: implement me
+		(void)light;
+	}
+
+	EGIHASH_NAMESPACE(full_t) EGIHASH_NAMESPACE(full_new)(EGIHASH_NAMESPACE(light_t) light, EGIHASH_NAMESPACE(callback) callback)
+	{
+		// TODO: implement me
+		(void)light; (void) callback;
+		return 0;
+	}
+
+	uint64_t EGIHASH_NAMESPACE(full_dag_size)(EGIHASH_NAMESPACE(full_t) full)
+	{
+		// TODO: implement me
+		(void)full;
+		return 0;
+	}
+
+	void const * EGIHASH_NAMESPACE(full_dag)(EGIHASH_NAMESPACE(full_t) full)
+	{
+		// TODO: implement me
+		(void)full;
+		return 0;
+	}
+
+	EGIHASH_NAMESPACE(result_t) EGIHASH_NAMESPACE(full_compute)(EGIHASH_NAMESPACE(full_t) full, EGIHASH_NAMESPACE(h256_t) header_hash, uint64_t nonce)
+	{
+		// TODO: implement me
+		(void)full; (void)header_hash; (void)nonce;
+		EGIHASH_NAMESPACE(result_t) result;
+		return result;
+	}
+
+	void EGIHASH_NAMESPACE(full_delete)(EGIHASH_NAMESPACE(full_t) full)
+	{
+		// TODO: implement me
+		(void)full;
+	}
+}
