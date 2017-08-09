@@ -523,7 +523,7 @@ namespace egihash
 		cout << "serialize_hash({41, 42}) == " << sha3_512_t::serialize(v) << endl;
 		if (success)
 		{
-			cout << "all tests passed" << endl;
+			cout << dec << "all tests passed" << endl;
 		}
 
 		return success;
