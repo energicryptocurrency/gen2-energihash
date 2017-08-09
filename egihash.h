@@ -28,7 +28,7 @@ typedef struct EGIHASH_NAMESPACE(full) * EGIHASH_NAMESPACE(full_t);
 typedef struct EGIHASH_NAMESPACE(h256) { uint8_t b[32]; } EGIHASH_NAMESPACE(h256_t);
 typedef struct EGIHASH_NAMESPACE(result) { EGIHASH_NAMESPACE(h256_t) value; EGIHASH_NAMESPACE(h256_t) mixhash; } EGIHASH_NAMESPACE(result_t);
 
-EGIHASH_NAMESPACE(light_t) EGIHASH_NAMESPACE(light_new)(unsigned int number);
+EGIHASH_NAMESPACE(light_t) EGIHASH_NAMESPACE(light_new)(unsigned int block_number);
 EGIHASH_NAMESPACE(result_t) EGIHASH_NAMESPACE(light_compute)(EGIHASH_NAMESPACE(light_t) light, EGIHASH_NAMESPACE(h256_t) header_hash, uint64_t nonce);
 void EGIHASH_NAMESPACE(light_delete)(EGIHASH_NAMESPACE(light_t) light);
 
