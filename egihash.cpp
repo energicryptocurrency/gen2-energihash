@@ -377,12 +377,16 @@ namespace egihash
 	}
 
 	// TODO: unit tests / validation
-	::std::vector<sha3_512_t::deserialized_hash_t> calc_dataset(::std::vector<sha3_512_t::deserialized_hash_t> const & cache, size_t const full_size)
+	::std::vector<sha3_512_t::deserialized_hash_t> calc_dataset(::std::vector<sha3_512_t::deserialized_hash_t> const & cache, size_t const full_size, EGIHASH_NAMESPACE(callback) progress_callback)
 	{
 		::std::vector<sha3_512_t::deserialized_hash_t> out;
 		for (size_t i = 0; i < (full_size / constants::HASH_BYTES); i++)
 		{
 			out.push_back(calc_dataset_item(cache, i));
+			if (progress_callback(i) != 0)
+			{
+				throw hash_exception("DAG creation cancelled.");
+			}
 		}
 		return out;
 	}
@@ -571,7 +575,7 @@ extern "C"
 		, callback(callback)
 		, dataset()
 		{
-			dataset = ::egihash::calc_dataset(light->cache, get_full_size(light->block_number)); // TODO: callback for progress
+			dataset = ::egihash::calc_dataset(light->cache, get_full_size(light->block_number), callback);
 		}
 
 		EGIHASH_NAMESPACE(result_t) compute(EGIHASH_NAMESPACE(h256_t) header_hash, uint64_t nonce)
