@@ -425,10 +425,11 @@ namespace egihash
 			cmix.push_back(fnv(fnv(fnv(mix[i], mix[i+1]), mix[i+2]), mix[i+3]));
 		}
 
-		::std::map<::std::string, ::std::string> out;
-		out.insert(decltype(out)::value_type(::std::string("mix digest"), sha3_512_t::serialize(cmix)));
-		s.insert(s.end(), cmix.begin(), cmix.end());
-		out.insert(decltype(out)::value_type(::std::string("result"), sha3_256_t::serialize(sha3_256(s))));
+		::std::shared_ptr<decltype(s)> shared_mix(::std::make_shared<decltype(s)>(std::move(cmix)));
+		::std::map<::std::string, decltype(shared_mix)> out;
+		out.insert(decltype(out)::value_type(::std::string("mix digest"), shared_mix));
+		s.insert(s.end(), shared_mix->begin(), shared_mix->end());
+		out.insert(decltype(out)::value_type(::std::string("result"), ::std::make_shared<decltype(s)>(sha3_256(s))));
 		return out;
 	}
 
