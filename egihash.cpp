@@ -564,51 +564,114 @@ extern "C"
 
 	EGIHASH_NAMESPACE(light_t) EGIHASH_NAMESPACE(light_new)(unsigned int block_number)
 	{
-		return new EGIHASH_NAMESPACE(light)(block_number);
+		try
+		{
+			return new EGIHASH_NAMESPACE(light)(block_number);
+		}
+		catch (...)
+		{
+			return 0; // nullptr return indicates error
+		}
 	}
 
 	EGIHASH_NAMESPACE(result_t) EGIHASH_NAMESPACE(light_compute)(EGIHASH_NAMESPACE(light_t) light, EGIHASH_NAMESPACE(h256_t) header_hash, uint64_t nonce)
 	{
-		return light->compute(header_hash, nonce);
+		try
+		{
+			return light->compute(header_hash, nonce);
+		}
+		catch (...)
+		{
+			// empty result indicates error
+			EGIHASH_NAMESPACE(result_t) result;
+			::std::memset(&result.value.b[0], 0, sizeof(result.value.b));
+			::std::memset(&result.mixhash.b[0], 0, sizeof(result.mixhash.b));
+			return result;
+		}
 	}
 
 	void EGIHASH_NAMESPACE(light_delete)(EGIHASH_NAMESPACE(light_t) light)
 	{
-		delete light;
+		try
+		{
+			delete light;
+		}
+		catch (...)
+		{
+			// no way to indicate error
+		}
 	}
 
 	EGIHASH_NAMESPACE(full_t) EGIHASH_NAMESPACE(full_new)(EGIHASH_NAMESPACE(light_t) light, EGIHASH_NAMESPACE(callback) callback)
 	{
-		// TODO: implement me
-		(void)light; (void) callback;
-		return 0;
+		try
+		{
+			// TODO: implement me
+			(void)light; (void) callback;
+			return 0;
+		}
+		catch (...)
+		{
+			return 0; // nullptr indicates error
+		}
 	}
 
 	uint64_t EGIHASH_NAMESPACE(full_dag_size)(EGIHASH_NAMESPACE(full_t) full)
 	{
-		// TODO: implement me
-		(void)full;
-		return 0;
+		try
+		{
+			// TODO: implement me
+			(void)full;
+			return 0;
+		}
+		catch (...)
+		{
+			return 0; // zero result indicates error
+		}
 	}
 
 	void const * EGIHASH_NAMESPACE(full_dag)(EGIHASH_NAMESPACE(full_t) full)
 	{
-		// TODO: implement me
-		(void)full;
-		return 0;
+		try
+		{
+			// TODO: implement me
+			(void)full;
+			return 0;
+		}
+		catch (...)
+		{
+			return 0; // nullptr indicates error
+		}
 	}
 
 	EGIHASH_NAMESPACE(result_t) EGIHASH_NAMESPACE(full_compute)(EGIHASH_NAMESPACE(full_t) full, EGIHASH_NAMESPACE(h256_t) header_hash, uint64_t nonce)
 	{
-		// TODO: implement me
-		(void)full; (void)header_hash; (void)nonce;
-		EGIHASH_NAMESPACE(result_t) result;
-		return result;
+		try
+		{
+			// TODO: implement me
+			(void)full; (void)header_hash; (void)nonce;
+			EGIHASH_NAMESPACE(result_t) result;
+			return result;
+		}
+		catch (...)
+		{
+			// empty result indicates error
+			EGIHASH_NAMESPACE(result_t) result;
+			::std::memset(&result.value.b[0], 0, sizeof(result.value.b));
+			::std::memset(&result.mixhash.b[0], 0, sizeof(result.mixhash.b));
+			return result;
+		}
 	}
 
 	void EGIHASH_NAMESPACE(full_delete)(EGIHASH_NAMESPACE(full_t) full)
 	{
-		// TODO: implement me
-		(void)full;
+		try
+		{
+			delete full;
+		}
+		catch (...)
+		{
+			// no way to indicate error
+		}
 	}
 }
