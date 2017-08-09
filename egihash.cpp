@@ -11,6 +11,7 @@ extern "C"
 #include <stdint.h>
 #include <algorithm>
 #include <cmath>
+#include <cstring>
 #include <functional>
 #include <iomanip>
 #include <limits>
@@ -39,6 +40,9 @@ namespace
 		constexpr uint32_t DATASET_PARENTS = 256u;                // number of parents of each dataset element
 		constexpr uint32_t CACHE_ROUNDS = 3u;                     // number of rounds in cache production
 		constexpr uint32_t ACCESSES = 64u;                        // number of accesses in hashimoto loop
+
+		constexpr EGIHASH_NAMESPACE(h256_t) empty_h256 = {{0}};
+		constexpr EGIHASH_NAMESPACE(result_t) empty_result = {{{0}}, {{0}}};
 	}
 
 	inline int32_t decode_int(uint8_t const * data, uint8_t const * dataEnd) noexcept
@@ -146,7 +150,7 @@ namespace
 	template <size_t HashSize, int (*HashFunction)(uint8_t *, size_t, uint8_t const * in, size_t)>
 	struct sha3_base
 	{
-		typedef ::std::vector<int32_t> deserialized_hash_t;
+		using deserialized_hash_t = ::std::vector<int32_t>;
 
 		static constexpr size_t hash_size = HashSize;
 		uint8_t data[hash_size];
@@ -218,6 +222,7 @@ namespace
 
 	struct sha3_256_t : public sha3_base<32, ::sha3_256>
 	{
+		using deserialized_hash_t = ::std::vector<int32_t>;
 
 		sha3_256_t(::std::string const & input)
 		: sha3_base(input)
@@ -230,10 +235,18 @@ namespace
 		{
 
 		}
+
+		sha3_256_t(EGIHASH_NAMESPACE(h256_t) const & h256)
+		: sha3_base()
+		{
+			::std::memcpy(&data[0], &h256.b[0], hash_size);
+		}
 	};
 
 	struct sha3_512_t : public sha3_base<64, ::sha3_512>
 	{
+		using deserialized_hash_t = ::std::vector<int32_t>;
+
 		sha3_512_t(::std::string const & input)
 		: sha3_base(input)
 		{
@@ -275,7 +288,7 @@ namespace egihash
 
 	// TODO: unit tests / validation
 	template <typename T>
-	sha3_512_t::deserialized_hash_t sha3_256(T const & data)
+	sha3_256_t::deserialized_hash_t sha3_256(T const & data)
 	{
 		return hash_words<sha3_256_t>(data);
 	}
@@ -364,12 +377,16 @@ namespace egihash
 	}
 
 	// TODO: unit tests / validation
-	::std::vector<sha3_512_t::deserialized_hash_t> calc_dataset(::std::vector<sha3_512_t::deserialized_hash_t> const & cache, size_t const full_size)
+	::std::vector<sha3_512_t::deserialized_hash_t> calc_dataset(::std::vector<sha3_512_t::deserialized_hash_t> const & cache, size_t const full_size, EGIHASH_NAMESPACE(callback) progress_callback)
 	{
 		::std::vector<sha3_512_t::deserialized_hash_t> out;
 		for (size_t i = 0; i < (full_size / constants::HASH_BYTES); i++)
 		{
 			out.push_back(calc_dataset_item(cache, i));
+			if (progress_callback(i) != 0)
+			{
+				throw hash_exception("DAG creation cancelled.");
+			}
 		}
 		return out;
 	}
@@ -415,10 +432,11 @@ namespace egihash
 			cmix.push_back(fnv(fnv(fnv(mix[i], mix[i+1]), mix[i+2]), mix[i+3]));
 		}
 
-		::std::map<::std::string, ::std::string> out;
-		out.insert(decltype(out)::value_type(::std::string("mix digest"), sha3_512_t::serialize(cmix)));
-		s.insert(s.end(), cmix.begin(), cmix.end());
-		out.insert(decltype(out)::value_type(::std::string("result"), sha3_256_t::serialize(sha3_256(s))));
+		::std::shared_ptr<decltype(s)> shared_mix(::std::make_shared<decltype(s)>(std::move(cmix)));
+		::std::map<::std::string, decltype(shared_mix)> out;
+		out.insert(decltype(out)::value_type(::std::string("mix digest"), shared_mix));
+		s.insert(s.end(), shared_mix->begin(), shared_mix->end());
+		out.insert(decltype(out)::value_type(::std::string("result"), ::std::make_shared<decltype(s)>(sha3_256(s))));
 		return out;
 	}
 
@@ -512,9 +530,158 @@ namespace egihash
 		cout << "serialize_hash({41, 42}) == " << sha3_512_t::serialize(v) << endl;
 		if (success)
 		{
-			cout << "all tests passed" << endl;
+			cout << dec << "all tests passed" << endl;
 		}
 
 		return success;
+	}
+}
+
+extern "C"
+{
+	struct EGIHASH_NAMESPACE(light)
+	{
+		unsigned int block_number;
+		::std::vector<sha3_512_t::deserialized_hash_t> cache;
+
+		EGIHASH_NAMESPACE(light)(unsigned int block_number)
+		: block_number(block_number)
+		, cache(::egihash::mkcache(get_cache_size(block_number), ::egihash::get_seedhash(block_number)))
+		{
+
+		}
+
+		EGIHASH_NAMESPACE(result_t) compute(EGIHASH_NAMESPACE(h256_t) header_hash, uint64_t nonce)
+		{
+			// TODO: copy-free version
+			EGIHASH_NAMESPACE(result_t) result;
+			auto ret = ::egihash::hashimoto_light(get_full_size(block_number), cache, sha3_256_t(header_hash).deserialize(), nonce);
+			auto const & val = ret["result"];
+			auto const & mix = ret["mix hash"];
+			::std::memcpy(result.value.b, &(*val)[0], sizeof(result.value.b));
+			::std::memcpy(result.mixhash.b, &(*mix)[0], sizeof(result.mixhash.b));
+			return result;
+		}
+	};
+
+	struct EGIHASH_NAMESPACE(full)
+	{
+		EGIHASH_NAMESPACE(light_t) light;
+		::std::vector<sha3_512_t::deserialized_hash_t> dataset;
+
+		EGIHASH_NAMESPACE(full)(EGIHASH_NAMESPACE(light_t) light, EGIHASH_NAMESPACE(callback) callback)
+		: light(light)
+		, dataset(::egihash::calc_dataset(light->cache, get_full_size(light->block_number), callback))
+		{
+		}
+
+		EGIHASH_NAMESPACE(result_t) compute(EGIHASH_NAMESPACE(h256_t) header_hash, uint64_t nonce)
+		{
+			// TODO: copy free version
+			// TODO: validate memset sizes i.e. min(sizeof(dest), sizeof(src))
+			EGIHASH_NAMESPACE(result_t) result;
+			auto ret = ::egihash::hashimoto_full(get_full_size(light->block_number), dataset, sha3_256_t(header_hash).deserialize(), nonce);
+			auto const & val = ret["result"];
+			auto const & mix = ret["mix hash"];
+			::std::memcpy(result.value.b, &(*val)[0], sizeof(result.value.b));
+			::std::memcpy(result.mixhash.b, &(*mix)[0], sizeof(result.mixhash.b));
+			return result;
+		}
+	};
+
+	EGIHASH_NAMESPACE(light_t) EGIHASH_NAMESPACE(light_new)(unsigned int block_number)
+	{
+		try
+		{
+			return new EGIHASH_NAMESPACE(light)(block_number);
+		}
+		catch (...)
+		{
+			return 0; // nullptr return indicates error
+		}
+	}
+
+	EGIHASH_NAMESPACE(result_t) EGIHASH_NAMESPACE(light_compute)(EGIHASH_NAMESPACE(light_t) light, EGIHASH_NAMESPACE(h256_t) header_hash, uint64_t nonce)
+	{
+		try
+		{
+			return light->compute(header_hash, nonce);
+		}
+		catch (...)
+		{
+			return constants::empty_result; // empty result indicates error
+		}
+	}
+
+	void EGIHASH_NAMESPACE(light_delete)(EGIHASH_NAMESPACE(light_t) light)
+	{
+		try
+		{
+			delete light;
+		}
+		catch (...)
+		{
+			// no way to indicate error
+		}
+	}
+
+	EGIHASH_NAMESPACE(full_t) EGIHASH_NAMESPACE(full_new)(EGIHASH_NAMESPACE(light_t) light, EGIHASH_NAMESPACE(callback) callback)
+	{
+		try
+		{
+			return new EGIHASH_NAMESPACE(full)(light, callback);
+		}
+		catch (...)
+		{
+			return 0; // nullptr indicates error
+		}
+	}
+
+	uint64_t EGIHASH_NAMESPACE(full_dag_size)(EGIHASH_NAMESPACE(full_t) full)
+	{
+		try
+		{
+			return get_full_size(full->light->block_number);
+		}
+		catch (...)
+		{
+			return 0; // zero result indicates error
+		}
+	}
+
+	void const * EGIHASH_NAMESPACE(full_dag)(EGIHASH_NAMESPACE(full_t) full)
+	{
+		try
+		{
+			return &full->dataset[0];
+		}
+		catch (...)
+		{
+			return 0; // nullptr indicates error
+		}
+	}
+
+	EGIHASH_NAMESPACE(result_t) EGIHASH_NAMESPACE(full_compute)(EGIHASH_NAMESPACE(full_t) full, EGIHASH_NAMESPACE(h256_t) header_hash, uint64_t nonce)
+	{
+		try
+		{
+			return full->compute(header_hash, nonce);
+		}
+		catch (...)
+		{
+			return constants::empty_result; // empty result indicates error
+		}
+	}
+
+	void EGIHASH_NAMESPACE(full_delete)(EGIHASH_NAMESPACE(full_t) full)
+	{
+		try
+		{
+			delete full;
+		}
+		catch (...)
+		{
+			// no way to indicate error
+		}
 	}
 }
