@@ -146,7 +146,7 @@ namespace
 	template <size_t HashSize, int (*HashFunction)(uint8_t *, size_t, uint8_t const * in, size_t)>
 	struct sha3_base
 	{
-		typedef ::std::vector<int32_t> deserialized_hash_t;
+		using deserialized_hash_t = ::std::vector<int32_t>;
 
 		static constexpr size_t hash_size = HashSize;
 		uint8_t data[hash_size];
@@ -218,6 +218,7 @@ namespace
 
 	struct sha3_256_t : public sha3_base<32, ::sha3_256>
 	{
+		using deserialized_hash_t = ::std::vector<int32_t>;
 
 		sha3_256_t(::std::string const & input)
 		: sha3_base(input)
@@ -234,6 +235,8 @@ namespace
 
 	struct sha3_512_t : public sha3_base<64, ::sha3_512>
 	{
+		using deserialized_hash_t = ::std::vector<int32_t>;
+
 		sha3_512_t(::std::string const & input)
 		: sha3_base(input)
 		{
@@ -275,7 +278,7 @@ namespace egihash
 
 	// TODO: unit tests / validation
 	template <typename T>
-	sha3_512_t::deserialized_hash_t sha3_256(T const & data)
+	sha3_256_t::deserialized_hash_t sha3_256(T const & data)
 	{
 		return hash_words<sha3_256_t>(data);
 	}
