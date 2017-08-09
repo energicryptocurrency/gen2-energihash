@@ -16,9 +16,11 @@ extern "C"
 {
 #endif // __cplusplus
 
-// TODO: implement C API
 #define EGIHASH_NAMESPACE_PREFIX egihash
-#define EGIHASH_NAMESPACE(name) EGIHASH_NAMESPACE_PREFIX ## _ ## name
+#define EGIHASH_CONCAT(x, y) EGIHASH_CONCAT_(x, y)
+#define EGIHASH_CONCAT_(x, y) x ## y
+#define EGIHASH_NAMESPACE(name) EGIHASH_NAMESPACE_(_ ## name)
+#define EGIHASH_NAMESPACE_(name) EGIHASH_CONCAT(EGIHASH_NAMESPACE_PREFIX, name)
 
 typedef int (* EGIHASH_NAMESPACE(callback))(unsigned int);
 typedef struct EGIHASH_NAMESPACE(light) * EGIHASH_NAMESPACE(light_t);
