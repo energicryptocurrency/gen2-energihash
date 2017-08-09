@@ -40,6 +40,9 @@ namespace
 		constexpr uint32_t DATASET_PARENTS = 256u;                // number of parents of each dataset element
 		constexpr uint32_t CACHE_ROUNDS = 3u;                     // number of rounds in cache production
 		constexpr uint32_t ACCESSES = 64u;                        // number of accesses in hashimoto loop
+
+		constexpr EGIHASH_NAMESPACE(h256_t) empty_h256 = { {0} };
+		constexpr EGIHASH_NAMESPACE(result_t) empty_result = { {{0}}, {{0}} };
 	}
 
 	inline int32_t decode_int(uint8_t const * data, uint8_t const * dataEnd) noexcept
@@ -582,11 +585,7 @@ extern "C"
 		}
 		catch (...)
 		{
-			// empty result indicates error
-			EGIHASH_NAMESPACE(result_t) result;
-			::std::memset(&result.value.b[0], 0, sizeof(result.value.b));
-			::std::memset(&result.mixhash.b[0], 0, sizeof(result.mixhash.b));
-			return result;
+			return constants::empty_result; // empty result indicates error
 		}
 	}
 
@@ -655,11 +654,7 @@ extern "C"
 		}
 		catch (...)
 		{
-			// empty result indicates error
-			EGIHASH_NAMESPACE(result_t) result;
-			::std::memset(&result.value.b[0], 0, sizeof(result.value.b));
-			::std::memset(&result.mixhash.b[0], 0, sizeof(result.mixhash.b));
-			return result;
+			return constants::empty_result; // empty result indicates error
 		}
 	}
 
