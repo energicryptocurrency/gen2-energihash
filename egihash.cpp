@@ -11,6 +11,7 @@ extern "C"
 #include <stdint.h>
 #include <algorithm>
 #include <cmath>
+#include <cstring>
 #include <functional>
 #include <iomanip>
 #include <limits>
@@ -230,6 +231,12 @@ namespace
 		: sha3_base(input, input_size)
 		{
 
+		}
+
+		sha3_256_t(EGIHASH_NAMESPACE(h256_t) const & h256)
+		: sha3_base()
+		{
+			::std::memcpy(&data[0], &h256.b[0], hash_size);
 		}
 	};
 
