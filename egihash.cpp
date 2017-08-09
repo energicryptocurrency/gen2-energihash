@@ -567,15 +567,12 @@ extern "C"
 	struct EGIHASH_NAMESPACE(full)
 	{
 		EGIHASH_NAMESPACE(light_t) light;
-		EGIHASH_NAMESPACE(callback) callback;
 		::std::vector<sha3_512_t::deserialized_hash_t> dataset;
 
 		EGIHASH_NAMESPACE(full)(EGIHASH_NAMESPACE(light_t) light, EGIHASH_NAMESPACE(callback) callback)
 		: light(light)
-		, callback(callback)
-		, dataset()
+		, dataset(::egihash::calc_dataset(light->cache, get_full_size(light->block_number), callback))
 		{
-			dataset = ::egihash::calc_dataset(light->cache, get_full_size(light->block_number), callback);
 		}
 
 		EGIHASH_NAMESPACE(result_t) compute(EGIHASH_NAMESPACE(h256_t) header_hash, uint64_t nonce)
