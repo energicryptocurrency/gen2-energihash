@@ -32,7 +32,7 @@ void EGIHASH_NAMESPACE(light_delete)(EGIHASH_NAMESPACE(light_t) light);
 
 EGIHASH_NAMESPACE(full_t) EGIHASH_NAMESPACE(full_new)(EGIHASH_NAMESPACE(light_t) light, EGIHASH_NAMESPACE(callback) callback);
 uint64_t EGIHASH_NAMESPACE(full_dag_size)(EGIHASH_NAMESPACE(full_t) full);
-void * const EGIHASH_NAMESPACE(full_dag)(EGIHASH_NAMESPACE(full_t) full);
+void const * EGIHASH_NAMESPACE(full_dag)(EGIHASH_NAMESPACE(full_t) full);
 EGIHASH_NAMESPACE(result_t) EGIHASH_NAMESPACE(full_compute)(EGIHASH_NAMESPACE(full_t) full, EGIHASH_NAMESPACE(h256_t) header_hash, uint64_t nonce);
 void EGIHASH_NAMESPACE(full_delete)(EGIHASH_NAMESPACE(full_t) full);
 
