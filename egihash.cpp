@@ -576,9 +576,15 @@ extern "C"
 
 		EGIHASH_NAMESPACE(result_t) compute(EGIHASH_NAMESPACE(h256_t) header_hash, uint64_t nonce)
 		{
-			// TODO: implement me
-			(void)header_hash; (void)nonce;
-			return constants::empty_result;
+			// TODO: copy free version
+			// TODO: validate memset sizes i.e. min(sizeof(dest), sizeof(src))
+			EGIHASH_NAMESPACE(result_t) result;
+			auto ret = ::egihash::hashimoto_full(get_full_size(light->block_number), dataset, sha3_256_t(header_hash).deserialize(), nonce);
+			auto const & val = ret["result"];
+			auto const & mix = ret["mix hash"];
+			::std::memcpy(result.value.b, &(*val)[0], sizeof(result.value.b));
+			::std::memcpy(result.mixhash.b, &(*mix)[0], sizeof(result.mixhash.b));
+			return result;
 		}
 	};
 
