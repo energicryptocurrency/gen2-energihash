@@ -562,7 +562,24 @@ extern "C"
 
 	struct EGIHASH_NAMESPACE(full)
 	{
+		EGIHASH_NAMESPACE(light_t) light;
+		EGIHASH_NAMESPACE(callback) callback;
 		::std::vector<sha3_512_t::deserialized_hash_t> dataset;
+
+		EGIHASH_NAMESPACE(full)(EGIHASH_NAMESPACE(light_t) light, EGIHASH_NAMESPACE(callback) callback)
+		: light(light)
+		, callback(callback)
+		, dataset()
+		{
+			// TODO: make dataset
+		}
+
+		EGIHASH_NAMESPACE(result_t) compute(EGIHASH_NAMESPACE(h256_t) header_hash, uint64_t nonce)
+		{
+			// TODO: implement me
+			(void)header_hash; (void)nonce;
+			return constants::empty_result;
+		}
 	};
 
 	EGIHASH_NAMESPACE(light_t) EGIHASH_NAMESPACE(light_new)(unsigned int block_number)
@@ -605,9 +622,7 @@ extern "C"
 	{
 		try
 		{
-			// TODO: implement me
-			(void)light; (void) callback;
-			return 0;
+			return new EGIHASH_NAMESPACE(full)(light, callback);
 		}
 		catch (...)
 		{
@@ -619,9 +634,7 @@ extern "C"
 	{
 		try
 		{
-			// TODO: implement me
-			(void)full;
-			return 0;
+			return get_full_size(full->light->block_number);
 		}
 		catch (...)
 		{
@@ -633,9 +646,7 @@ extern "C"
 	{
 		try
 		{
-			// TODO: implement me
-			(void)full;
-			return 0;
+			return &full->dataset[0];
 		}
 		catch (...)
 		{
@@ -647,10 +658,7 @@ extern "C"
 	{
 		try
 		{
-			// TODO: implement me
-			(void)full; (void)header_hash; (void)nonce;
-			EGIHASH_NAMESPACE(result_t) result;
-			return result;
+			return full->compute(header_hash, nonce);
 		}
 		catch (...)
 		{
