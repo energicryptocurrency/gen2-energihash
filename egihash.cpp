@@ -532,25 +532,49 @@ namespace egihash
 
 extern "C"
 {
-	EGIHASH_NAMESPACE(light_t) EGIHASH_NAMESPACE(light_new)(unsigned int number)
+	struct EGIHASH_NAMESPACE(light)
 	{
-		// TODO: implement me
-		(void)number;
-		return 0;
+		unsigned int block_number;
+		::std::vector<sha3_512_t::deserialized_hash_t> cache;
+
+		EGIHASH_NAMESPACE(light)(unsigned int block_number)
+		: block_number(block_number)
+		, cache(::egihash::mkcache(get_cache_size(block_number), ::egihash::get_seedhash(block_number)))
+		{
+
+		}
+
+		EGIHASH_NAMESPACE(result_t) compute(EGIHASH_NAMESPACE(h256_t) header_hash, uint64_t nonce)
+		{
+			// TODO: copy-free version
+			EGIHASH_NAMESPACE(result_t) result;
+			auto ret = ::egihash::hashimoto_light(get_full_size(block_number), cache, sha3_256_t(header_hash).deserialize(), nonce);
+			auto const & val = ret["result"];
+			auto const & mix = ret["mix hash"];
+			::std::memcpy(result.value.b, &(*val)[0], sizeof(result.value.b));
+			::std::memcpy(result.mixhash.b, &(*mix)[0], sizeof(result.mixhash.b));
+			return result;
+		}
+	};
+
+	struct EGIHASH_NAMESPACE(full)
+	{
+		::std::vector<sha3_512_t::deserialized_hash_t> dataset;
+	};
+
+	EGIHASH_NAMESPACE(light_t) EGIHASH_NAMESPACE(light_new)(unsigned int block_number)
+	{
+		return new EGIHASH_NAMESPACE(light)(block_number);
 	}
 
 	EGIHASH_NAMESPACE(result_t) EGIHASH_NAMESPACE(light_compute)(EGIHASH_NAMESPACE(light_t) light, EGIHASH_NAMESPACE(h256_t) header_hash, uint64_t nonce)
 	{
-		// TODO: implement me
-		(void)light; (void)header_hash; (void)nonce;
-		EGIHASH_NAMESPACE(result_t) result;
-		return result;
+		return light->compute(header_hash, nonce);
 	}
 
 	void EGIHASH_NAMESPACE(light_delete)(EGIHASH_NAMESPACE(light_t) light)
 	{
-		// TODO: implement me
-		(void)light;
+		delete light;
 	}
 
 	EGIHASH_NAMESPACE(full_t) EGIHASH_NAMESPACE(full_new)(EGIHASH_NAMESPACE(light_t) light, EGIHASH_NAMESPACE(callback) callback)
