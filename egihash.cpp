@@ -571,7 +571,7 @@ extern "C"
 		, callback(callback)
 		, dataset()
 		{
-			// TODO: make dataset
+			dataset = ::egihash::calc_dataset(light->cache, get_full_size(light->block_number)); // TODO: callback for progress
 		}
 
 		EGIHASH_NAMESPACE(result_t) compute(EGIHASH_NAMESPACE(h256_t) header_hash, uint64_t nonce)
