@@ -38,6 +38,8 @@ void const * EGIHASH_NAMESPACE(full_dag)(EGIHASH_NAMESPACE(full_t) full);
 EGIHASH_NAMESPACE(result_t) EGIHASH_NAMESPACE(full_compute)(EGIHASH_NAMESPACE(full_t) full, EGIHASH_NAMESPACE(h256_t) header_hash, uint64_t nonce);
 void EGIHASH_NAMESPACE(full_delete)(EGIHASH_NAMESPACE(full_t) full);
 
+void egihash_h256_compute(EGIHASH_NAMESPACE(h256_t) * output_hash, void * input_data, uint64_t input_size);
+
 #ifdef __cplusplus
 } // extern "C"
 #endif // __cplusplus
