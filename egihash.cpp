@@ -543,8 +543,6 @@ namespace egihash
 			return insert_pair.first->second;
 		}
 
-		impl.reset();
-
 		// if insert failed, it's probably already been inserted
 		auto const dag_cache_iterator = dag_cache.find(epoch_number);
 		if (dag_cache_iterator != dag_cache.end())
@@ -552,6 +550,7 @@ namespace egihash
 			return dag_cache_iterator->second;
 		}
 
+		// we couldn't insert it and it's not in the cache
 		throw hash_exception("Could not get DAG");
 	}
 
