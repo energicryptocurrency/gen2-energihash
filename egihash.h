@@ -35,6 +35,8 @@ namespace egihash
 		size_type size() const;
 		data_type const & data() const;
 
+		static size_type get_cache_size(uint64_t const block_number) noexcept;
+
 		struct impl_t;
 		::std::shared_ptr<impl_t> impl;
 	};
@@ -60,6 +62,8 @@ namespace egihash
 		size_type size() const;
 		data_type const & data() const;
 		void save(::std::string const & file_path) const;
+
+		static size_type get_full_size(uint64_t const block_number) noexcept;
 
 		struct impl_t;
 		::std::shared_ptr<impl_t> impl;

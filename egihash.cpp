@@ -100,30 +100,6 @@ namespace
 		return true;
 	}
 
-	uint64_t get_cache_size(uint64_t block_number) noexcept
-	{
-		using namespace constants;
-
-		uint64_t cache_size = (CACHE_BYTES_INIT + (CACHE_BYTES_GROWTH * (block_number / EPOCH_LENGTH))) - HASH_BYTES;
-		while (!is_prime(cache_size / HASH_BYTES))
-		{
-			cache_size -= (2 * HASH_BYTES);
-		}
-		return cache_size;
-	}
-
-	uint64_t get_full_size(uint64_t block_number) noexcept
-	{
-		using namespace constants;
-
-		uint64_t full_size = (DATASET_BYTES_INIT + (DATASET_BYTES_GROWTH * (block_number / EPOCH_LENGTH))) - MIX_BYTES;
-		while (!is_prime(full_size / MIX_BYTES))
-		{
-			full_size -= (2 * MIX_BYTES);
-		}
-		return full_size;
-	}
-
 	inline uint32_t fnv(uint32_t v1, uint32_t v2) noexcept
 	{
 		constexpr uint32_t FNV_PRIME = 0x01000193ull;             // prime number used for FNV hash function
@@ -324,45 +300,6 @@ namespace egihash
 	}
 
 	// TODO: unit tests / validation
-	sha3_512_t::deserialized_hash_t calc_dataset_item(::std::vector<sha3_512_t::deserialized_hash_t> const & cache, size_t const i)
-	{
-		size_t const n = cache.size();
-		constexpr size_t r = constants::HASH_BYTES / constants::WORD_BYTES;
-		sha3_512_t::deserialized_hash_t mix;
-		std::copy(cache[i%n].begin(), cache[i%n].end(), mix.begin());
-		mix[0] ^= i;
-		mix = sha3_512(mix);
-		for (size_t j = 0; j < constants::DATASET_PARENTS; j++)
-		{
-			size_t const cache_index = fnv(i ^ j, mix[j % r]);
-			auto l = cache[cache_index % n].begin();
-			auto lEnd = cache[cache_index % n].end();
-			for (auto k = mix.begin(), kEnd = mix.end();
-				((k != kEnd) && (l != lEnd)); k++, l++)
-			{
-				*k = fnv(*k, *l);
-			}
-
-		}
-		return sha3_512(mix);
-	}
-
-	// TODO: unit tests / validation
-	::std::vector<sha3_512_t::deserialized_hash_t> calc_dataset(::std::vector<sha3_512_t::deserialized_hash_t> const & cache, size_t const full_size, EGIHASH_NAMESPACE(callback) progress_callback)
-	{
-		::std::vector<sha3_512_t::deserialized_hash_t> out;
-		for (size_t i = 0; i < (full_size / constants::HASH_BYTES); i++)
-		{
-			out.push_back(calc_dataset_item(cache, i));
-			if (progress_callback(i) != 0)
-			{
-				throw hash_exception("DAG creation cancelled.");
-			}
-		}
-		return out;
-	}
-
-	// TODO: unit tests / validation
 	decltype(auto) hashimoto(sha3_256_t::deserialized_hash_t const & header, uint64_t const nonce, size_t const full_size, ::std::function<sha3_512_t::deserialized_hash_t (size_t const)> lookup)
 	{
 		auto const n = full_size / constants::HASH_BYTES;
@@ -464,6 +401,18 @@ namespace egihash
 			}
 		}
 
+		static size_type get_cache_size(uint64_t block_number) noexcept
+		{
+			using namespace constants;
+
+			size_type cache_size = (CACHE_BYTES_INIT + (CACHE_BYTES_GROWTH * (block_number / EPOCH_LENGTH))) - HASH_BYTES;
+			while (!is_prime(cache_size / HASH_BYTES))
+			{
+				cache_size -= (2 * HASH_BYTES);
+			}
+			return cache_size;
+		}
+
 		uint64_t epoch;
 		size_type size;
 		data_type data;
@@ -489,6 +438,11 @@ namespace egihash
 		return impl->data;
 	}
 
+	cache::size_type cache::get_cache_size(uint64_t const block_number) noexcept
+	{
+		return impl_t::get_cache_size(block_number);
+	}
+
 	struct dag::impl_t
 	{
 		using size_type = dag::size_type;
@@ -500,13 +454,16 @@ namespace egihash
 		impl_t(uint64_t block_number, progress_callback_type callback)
 		: epoch(block_number / constants::EPOCH_LENGTH)
 		, size(get_full_size(block_number))
+		, cache(block_number, get_seedhash(block_number))
 		, data()
 		{
-			generate(block_number, callback);
+			generate(callback);
 		}
 
 		impl_t(::std::string const & file_path)
 		: epoch(max_epoch)
+		, size(0)
+		, cache(max_epoch, "") // TODO: fixme
 		, data()
 		{
 			load(file_path);
@@ -524,15 +481,58 @@ namespace egihash
 			(void)file_path;
 		}
 
-		void generate(uint64_t block_number, progress_callback_type callback)
+		void generate(progress_callback_type callback)
 		{
-			// TODO: implement me
-			(void)block_number;
-			(void)callback;
+			size_type const n = size / constants::HASH_BYTES;
+			data.reserve(n);
+			for (size_type i = 0; i < n; i++)
+			{
+				data.push_back(calc_dataset_item(cache.data(), i));
+				if (callback(i) != 0)
+				{
+					throw hash_exception("DAG creation cancelled.");
+				}
+			}
+		}
+
+		data_type::value_type calc_dataset_item(::std::vector<sha3_512_t::deserialized_hash_t> const & cache, size_type const i)
+		{
+			size_type const n = cache.size();
+			constexpr size_type r = constants::HASH_BYTES / constants::WORD_BYTES;
+			sha3_512_t::deserialized_hash_t mix;
+			std::copy(cache[i%n].begin(), cache[i%n].end(), mix.begin());
+			mix[0] ^= i;
+			mix = sha3_512(mix);
+			for (size_type j = 0; j < constants::DATASET_PARENTS; j++)
+			{
+				size_type const cache_index = fnv(i ^ j, mix[j % r]);
+				auto l = cache[cache_index % n].begin();
+				auto lEnd = cache[cache_index % n].end();
+				for (auto k = mix.begin(), kEnd = mix.end();
+					((k != kEnd) && (l != lEnd)); k++, l++)
+				{
+					*k = fnv(*k, *l);
+				}
+
+			}
+			return sha3_512(mix);
+		}
+
+		static size_type get_full_size(uint64_t const block_number) noexcept
+		{
+			using namespace constants;
+
+			uint64_t full_size = (DATASET_BYTES_INIT + (DATASET_BYTES_GROWTH * (block_number / EPOCH_LENGTH))) - MIX_BYTES;
+			while (!is_prime(full_size / MIX_BYTES))
+			{
+				full_size -= (2 * MIX_BYTES);
+			}
+			return full_size;
 		}
 
 		uint64_t epoch;
 		size_type size;
+		cache cache;
 		data_type data;
 	};
 
@@ -618,6 +618,11 @@ namespace egihash
 	void dag::save(::std::string const & file_path) const
 	{
 		impl->save(file_path);
+	}
+
+	dag::size_type dag::get_full_size(uint64_t const block_number) noexcept
+	{
+		return impl_t::get_full_size(block_number);
 	}
 
 	bool test_function()
