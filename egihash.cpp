@@ -443,8 +443,7 @@ namespace egihash
 		{
 			size_type const n = cache.size();
 			constexpr size_type r = constants::HASH_BYTES / constants::WORD_BYTES;
-			sha3_512_t::deserialized_hash_t mix;
-			std::copy(cache[i%n].begin(), cache[i%n].end(), mix.begin());
+			sha3_512_t::deserialized_hash_t mix(cache[i%n]);
 			mix[0] ^= i;
 			mix = sha3_512(mix);
 			for (size_type j = 0; j < constants::DATASET_PARENTS; j++)
