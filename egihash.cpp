@@ -289,9 +289,9 @@ namespace egihash
 	}
 
 	// TODO: unit tests / validation
-	::std::string get_seedhash(size_t const block_number)
+	::std::string get_seedhash(uint64_t const block_number)
 	{
-		::std::string s(32, 0); // TODO: randomized seedhash not zero seedhash
+		::std::string s(epoch0_seedhash);
 		for (size_t i = 0; i < (block_number / constants::EPOCH_LENGTH); i++)
 		{
 			s = sha3_256_t::serialize(sha3_256(s));

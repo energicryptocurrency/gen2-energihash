@@ -16,6 +16,10 @@ namespace egihash
 {
 	bool test_function();
 
+	// TODO: randomized seedhash not zero seedhash
+	static constexpr char epoch0_seedhash[] = "\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00";
+	::std::string get_seedhash(uint64_t const block_number);
+
 	struct cache
 	{
 		using size_type = ::std::size_t;
