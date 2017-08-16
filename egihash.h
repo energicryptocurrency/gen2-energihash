@@ -10,18 +10,43 @@
 
 #include <functional>
 #include <memory>
+#include <vector>
 
 namespace egihash
 {
 	bool test_function();
 
+	struct cache
+	{
+		using size_type = ::std::size_t;
+		using data_type = ::std::vector<::std::vector<int32_t>>;
+
+		cache(const cache &) = default;
+		cache & operator=(cache const &) = default;
+		~cache() = default;
+
+		cache() = delete;
+		cache(cache &&) = delete;
+		cache & operator=(cache &&) = delete;
+
+		cache(uint64_t block_number, ::std::string const & seed);
+
+		uint64_t epoch() const;
+		size_type size() const;
+		data_type const & data() const;
+
+		struct impl_t;
+		::std::shared_ptr<impl_t> impl;
+	};
+
 	struct dag
 	{
 		using size_type = ::std::size_t;
+		using data_type = ::std::vector<::std::vector<int32_t>>;
 		using progress_callback_type = ::std::function<size_type (size_type)>;
 
-		dag(const dag &) = default;
-		dag & operator=(const dag &) = default;
+		dag(dag const &) = default;
+		dag & operator=(dag const &) = default;
 		~dag() = default;
 
 		dag() = delete;
@@ -33,11 +58,11 @@ namespace egihash
 
 		uint64_t epoch() const;
 		size_type size() const;
-		void const * data() const;
+		data_type const & data() const;
 		void save(::std::string const & file_path) const;
 
-		struct impl;
-		::std::shared_ptr<impl> m_impl;
+		struct impl_t;
+		::std::shared_ptr<impl_t> impl;
 	};
 }
 

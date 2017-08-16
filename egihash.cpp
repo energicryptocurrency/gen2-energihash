@@ -324,36 +324,6 @@ namespace egihash
 	}
 
 	// TODO: unit tests / validation
-	::std::vector<sha3_512_t::deserialized_hash_t> mkcache(size_t const cache_size, ::std::string seed)
-	{
-		size_t n = cache_size / constants::HASH_BYTES;
-
-		::std::vector<sha3_512_t::deserialized_hash_t> o{sha3_512(seed)};
-		for (size_t i = 1; i < n; i++)
-		{
-			o.push_back(sha3_512(o.back()));
-		}
-
-		for (size_t i = 0; i < constants::CACHE_ROUNDS; i++)
-		{
-			for (size_t j = 0; j < n; j++)
-			{
-				auto v = o[j][0] % n;
-				auto & u = o[(j-1+n)%n];
-				size_t count = 0;
-				for (auto & k : u)
-				{
-					count++;
-					k = k ^ o[v][count];
-				}
-				o[i] = sha3_512(u);
-			}
-		}
-
-		return o;
-	}
-
-	// TODO: unit tests / validation
 	sha3_512_t::deserialized_hash_t calc_dataset_item(::std::vector<sha3_512_t::deserialized_hash_t> const & cache, size_t const i)
 	{
 		size_t const n = cache.size();
@@ -453,40 +423,93 @@ namespace egihash
 		return hashimoto(header, nonce, full_size, [dataset](size_t const x){return dataset[x];});
 	}
 
-	struct dag::impl
+	struct cache::impl_t
+	{
+		using size_type = cache::size_type;
+		using data_type = ::std::vector<::std::vector<int32_t>>;
+
+		impl_t(uint64_t const block_number, ::std::string const & seed)
+		: epoch(block_number / constants::EPOCH_LENGTH)
+		, size(get_cache_size(block_number))
+		, data()
+		{
+			mkcache(seed);
+		}
+
+		void mkcache(::std::string const & seed)
+		{
+			size_t n = size / constants::HASH_BYTES;
+
+			data.reserve(n);
+			data.push_back(sha3_512(seed));
+			for (size_t i = 1; i < n; i++)
+			{
+				data.push_back(sha3_512(data.back()));
+			}
+
+			for (size_t i = 0; i < constants::CACHE_ROUNDS; i++)
+			{
+				for (size_t j = 0; j < n; j++)
+				{
+					auto v = data[j][0] % n;
+					auto & u = data[(j-1+n)%n];
+					size_t count = 0;
+					for (auto & k : u)
+					{
+						count++;
+						k = k ^ data[v][count];
+					}
+					data[i] = sha3_512(u);
+				}
+			}
+		}
+
+		uint64_t epoch;
+		size_type size;
+		data_type data;
+	};
+
+	cache::cache(uint64_t const block_number, ::std::string const & seed)
+	: impl(new impl_t(block_number, seed))
+	{
+	}
+
+	uint64_t cache::epoch() const
+	{
+		return impl->epoch;
+	}
+
+	cache::size_type cache::size() const
+	{
+		return impl->size;
+	}
+
+	cache::data_type const & cache::data() const
+	{
+		return impl->data;
+	}
+
+	struct dag::impl_t
 	{
 		using size_type = dag::size_type;
 		using progress_callback_type = dag::progress_callback_type;
-		using dag_cache_map = std::map<uint64_t /* epoch */, ::std::shared_ptr<impl>>;
+		using data_type = ::std::vector<::std::vector<int32_t>>;
+		using dag_cache_map = ::std::map<uint64_t /* epoch */, ::std::shared_ptr<impl_t>>;
 		static constexpr uint64_t max_epoch = ::std::numeric_limits<uint64_t>::max();
 
-		impl(uint64_t block_number, progress_callback_type callback)
-		: full_dag()
-		, epoch_number(block_number / constants::EPOCH_LENGTH)
+		impl_t(uint64_t block_number, progress_callback_type callback)
+		: epoch(block_number / constants::EPOCH_LENGTH)
+		, size(get_full_size(block_number))
+		, data()
 		{
 			generate(block_number, callback);
 		}
 
-		impl(::std::string const & file_path)
-		: full_dag()
-		, epoch_number(max_epoch)
+		impl_t(::std::string const & file_path)
+		: epoch(max_epoch)
+		, data()
 		{
 			load(file_path);
-		}
-
-		uint64_t epoch() const
-		{
-			return epoch_number;
-		}
-
-		size_type size() const
-		{
-			return static_cast<size_type>(full_dag.size());
-		}
-
-		void const * data() const
-		{
-			return &full_dag[0];
 		}
 
 		void save(::std::string const & file_path) const
@@ -508,14 +531,15 @@ namespace egihash
 			(void)callback;
 		}
 
-		::std::vector<int32_t> full_dag;
-		uint64_t epoch_number;
+		uint64_t epoch;
+		size_type size;
+		data_type data;
 	};
 
-	static dag::impl::dag_cache_map dag_cache;
+	static dag::impl_t::dag_cache_map dag_cache;
 	static ::std::mutex dag_cache_mutex;
 
-	::std::shared_ptr<dag::impl> get_dag(uint64_t block_number, dag::progress_callback_type callback)
+	::std::shared_ptr<dag::impl_t> get_dag(uint64_t block_number, dag::progress_callback_type callback)
 	{
 		using namespace std;
 		uint64_t epoch_number = block_number / constants::EPOCH_LENGTH;
@@ -532,7 +556,7 @@ namespace egihash
 
 		// otherwise create the dag and add it to the cache
 		// this is not locked as it can be a lengthy process and we don't want to block access to the dag cache
-		shared_ptr<dag::impl> impl(new dag::impl(block_number, callback));
+		shared_ptr<dag::impl_t> impl(new dag::impl_t(block_number, callback));
 
 		lock_guard<mutex> lock(dag_cache_mutex);
 		auto insert_pair = dag_cache.insert(make_pair(epoch_number, impl));
@@ -554,10 +578,10 @@ namespace egihash
 		throw hash_exception("Could not get DAG");
 	}
 
-	::std::shared_ptr<dag::impl> get_dag(::std::string const & file_path)
+	::std::shared_ptr<dag::impl_t> get_dag(::std::string const & file_path)
 	{
 		using namespace std;
-		shared_ptr<dag::impl> impl;
+		shared_ptr<dag::impl_t> impl;
 
 		// TODO: implement me
 		(void)file_path;
@@ -566,34 +590,34 @@ namespace egihash
 	}
 
 	dag::dag(uint64_t block_number, progress_callback_type callback)
-	: m_impl(get_dag(block_number, callback))
+	: impl(get_dag(block_number, callback))
 	{
 	}
 
 	dag::dag(::std::string const & file_path)
-	: m_impl(get_dag(file_path))
+	: impl(get_dag(file_path))
 	{
 
 	}
 
 	uint64_t dag::epoch() const
 	{
-		return m_impl->epoch();
+		return impl->epoch;
 	}
 
 	dag::size_type dag::size() const
 	{
-		return m_impl->size();
+		return impl->size;
 	}
 
-	void const * dag::data() const
+	dag::data_type const & dag::data() const
 	{
-		return m_impl->data();
+		return impl->data;
 	}
 
 	void dag::save(::std::string const & file_path) const
 	{
-		m_impl->save(file_path);
+		impl->save(file_path);
 	}
 
 	bool test_function()
@@ -686,11 +710,11 @@ extern "C"
 	struct EGIHASH_NAMESPACE(light)
 	{
 		unsigned int block_number;
-		::std::vector<sha3_512_t::deserialized_hash_t> cache;
+		::egihash::cache cache;
 
 		EGIHASH_NAMESPACE(light)(unsigned int block_number)
 		: block_number(block_number)
-		, cache(::egihash::mkcache(get_cache_size(block_number), ::egihash::get_seedhash(block_number)))
+		, cache(block_number, ::egihash::get_seedhash(block_number))
 		{
 
 		}
@@ -699,7 +723,7 @@ extern "C"
 		{
 			// TODO: copy-free version
 			EGIHASH_NAMESPACE(result_t) result;
-			auto ret = ::egihash::hashimoto_light(get_full_size(block_number), cache, sha3_256_t(header_hash).deserialize(), nonce);
+			auto ret = ::egihash::hashimoto_light(get_full_size(block_number), cache.data(), sha3_256_t(header_hash).deserialize(), nonce);
 			auto const & val = ret["result"];
 			auto const & mix = ret["mix hash"];
 			::std::memcpy(result.value.b, &(*val)[0], sizeof(result.value.b));
@@ -715,8 +739,9 @@ extern "C"
 
 		EGIHASH_NAMESPACE(full)(EGIHASH_NAMESPACE(light_t) light, EGIHASH_NAMESPACE(callback) callback)
 		: light(light)
-		, dataset(::egihash::calc_dataset(light->cache, get_full_size(light->block_number), callback))
+		, dataset()//TODO::egihash::calc_dataset(light->cache, get_full_size(light->block_number), callback))
 		{
+			(void)callback;//TODO
 		}
 
 		EGIHASH_NAMESPACE(result_t) compute(EGIHASH_NAMESPACE(h256_t) header_hash, uint64_t nonce)
