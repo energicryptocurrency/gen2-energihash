@@ -291,7 +291,7 @@ namespace egihash
 	// TODO: unit tests / validation
 	::std::string get_seedhash(size_t const block_number)
 	{
-		::std::string s(32, 0);
+		::std::string s(32, 0); // TODO: randomized seedhash not zero seedhash
 		for (size_t i = 0; i < (block_number / constants::EPOCH_LENGTH); i++)
 		{
 			s = sha3_256_t::serialize(sha3_256(s));
@@ -518,6 +518,11 @@ namespace egihash
 			return sha3_512(mix);
 		}
 
+		cache get_cache() const
+		{
+			return cache;
+		}
+
 		static size_type get_full_size(uint64_t const block_number) noexcept
 		{
 			using namespace constants;
@@ -618,6 +623,11 @@ namespace egihash
 	void dag::save(::std::string const & file_path) const
 	{
 		impl->save(file_path);
+	}
+
+	cache dag::get_cache() const
+	{
+		return impl->get_cache();
 	}
 
 	dag::size_type dag::get_full_size(uint64_t const block_number) noexcept

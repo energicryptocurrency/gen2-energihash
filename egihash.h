@@ -63,6 +63,8 @@ namespace egihash
 		data_type const & data() const;
 		void save(::std::string const & file_path) const;
 
+		cache get_cache() const;
+
 		static size_type get_full_size(uint64_t const block_number) noexcept;
 
 		struct impl_t;
