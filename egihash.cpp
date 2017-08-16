@@ -12,6 +12,7 @@ extern "C"
 #include <algorithm>
 #include <cmath>
 #include <cstring>
+#include <fstream>
 #include <functional>
 #include <iomanip>
 #include <limits>
@@ -29,6 +30,9 @@ namespace
 {
 	namespace constants
 	{
+		constexpr uint32_t MAJOR_VERSION = 1u;
+		constexpr uint32_t REVISION = 23u;
+		constexpr uint32_t MINOR_VERSION = 0u;
 		constexpr uint32_t WORD_BYTES = 4u;                       // bytes in word
 		constexpr uint32_t DATASET_BYTES_INIT = 1u << 30u;        // bytes in dataset at genesis
 		constexpr uint32_t DATASET_BYTES_GROWTH = 1u << 23u;      // dataset growth per epoch
@@ -415,8 +419,44 @@ namespace egihash
 
 		void save(::std::string const & file_path) const
 		{
-			// TODO: implement me
-			(void)file_path;
+			using namespace std;
+			ofstream fs;
+			fs.open(file_path, ios::out | ios::binary);
+
+			uint64_t cache_begin = 57;
+			uint64_t cache_end = cache_begin + cache.size();
+			uint64_t dag_begin = cache_end + 1;
+			uint64_t dag_end = dag_begin + size;
+
+			// TODO: write all values in little endian
+			fs << "EGIHASH_DAG"
+				<< 0
+				<< constants::MAJOR_VERSION
+				<< constants::REVISION
+				<< constants::MINOR_VERSION
+				<< cache_begin
+				<< cache_end
+				<< dag_begin
+				<< dag_end
+				<< 0;
+
+			for (auto const i : cache.data())
+			{
+				for (auto const j : i)
+				{
+					fs << j;
+				}
+			}
+
+			for (auto const i : data)
+			{
+				for (auto const j : i)
+				{
+					fs << j;
+				}
+			}
+
+			fs.close();
 		}
 
 		void load(::std::string const & file_path) const
