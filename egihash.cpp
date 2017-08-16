@@ -17,6 +17,7 @@ extern "C"
 #include <limits>
 #include <map>
 #include <memory>
+#include <mutex>
 #include <stdexcept>
 #include <string>
 #include <sstream>
@@ -450,6 +451,143 @@ namespace egihash
 	decltype(auto) hashimoto_full(size_t const full_size, ::std::vector<sha3_512_t::deserialized_hash_t> const dataset, sha3_256_t::deserialized_hash_t const & header, uint64_t const nonce)
 	{
 		return hashimoto(header, nonce, full_size, [dataset](size_t const x){return dataset[x];});
+	}
+
+	struct dag::impl
+	{
+		using size_type = dag::size_type;
+		using progress_callback_type = dag::progress_callback_type;
+		using dag_cache_map = std::map<uint64_t /* epoch */, ::std::shared_ptr<impl>>;
+		static constexpr uint64_t max_epoch = ::std::numeric_limits<uint64_t>::max();
+
+		impl(uint64_t block_number, progress_callback_type callback)
+		: full_dag()
+		, epoch_number(block_number / constants::EPOCH_LENGTH)
+		{
+			generate(block_number, callback);
+		}
+
+		impl(::std::string const & file_path)
+		: full_dag()
+		, epoch_number(max_epoch)
+		{
+			load(file_path);
+		}
+
+		uint64_t epoch() const
+		{
+			return epoch_number;
+		}
+
+		size_type size() const
+		{
+			return static_cast<size_type>(full_dag.size());
+		}
+
+		void const * data() const
+		{
+			return &full_dag[0];
+		}
+
+		void save(::std::string const & file_path) const
+		{
+			// TODO: implement me
+			(void)file_path;
+		}
+
+		void load(::std::string const & file_path) const
+		{
+			// TODO: implement me
+			(void)file_path;
+		}
+
+		void generate(uint64_t block_number, progress_callback_type callback)
+		{
+			// TODO: implement me
+			(void)block_number;
+			(void)callback;
+		}
+
+		::std::vector<int32_t> full_dag;
+		uint64_t epoch_number;
+	};
+
+	static dag::impl::dag_cache_map dag_cache;
+	static ::std::mutex dag_cache_mutex;
+
+	::std::shared_ptr<dag::impl> get_dag(uint64_t block_number, dag::progress_callback_type callback)
+	{
+		using namespace std;
+		shared_ptr<dag::impl> impl;
+		uint64_t epoch_number = block_number / constants::EPOCH_LENGTH;
+
+		// if we have the correct DAG already loaded, return it from the cache
+		{
+			lock_guard<mutex> lock(dag_cache_mutex);
+			auto const dag_cache_iterator = dag_cache.find(epoch_number);
+			if (dag_cache_iterator != dag_cache.end())
+			{
+				return dag_cache_iterator->second;
+			}
+		}
+
+		// otherwise create the dag and add it to the cache
+		impl.reset(new dag::impl(block_number, callback));
+
+		lock_guard<mutex> lock(dag_cache_mutex);
+		auto insert_pair = dag_cache.insert(make_pair(epoch_number, impl));
+		if (insert_pair.second)
+		{
+			return insert_pair.first->second;
+		}
+		else
+		{
+			// TODO: this dag has already been inserted.. should we notify the caller?
+		}
+
+		return impl;
+	}
+
+	::std::shared_ptr<dag::impl> get_dag(::std::string const & file_path)
+	{
+		using namespace std;
+		shared_ptr<dag::impl> impl;
+
+		// TODO: implement me
+		(void)file_path;
+
+		return impl;
+	}
+
+	dag::dag(uint64_t block_number, progress_callback_type callback)
+	: m_impl(get_dag(block_number, callback))
+	{
+	}
+
+	dag::dag(::std::string const & file_path)
+	: m_impl(get_dag(file_path))
+	{
+
+	}
+
+	uint64_t dag::epoch() const
+	{
+		return m_impl->epoch();
+	}
+
+	dag::size_type dag::size() const
+	{
+		return m_impl->size();
+	}
+
+	void const * dag::data() const
+	{
+		return m_impl->data();
+	}
+
+	void dag::save(::std::string const & file_path) const
+	{
+		m_impl->save(file_path);
 	}
 
 	bool test_function()

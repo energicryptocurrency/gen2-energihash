@@ -7,9 +7,38 @@
 #include <stdint.h>
 
 #ifdef __cplusplus
+
+#include <functional>
+#include <memory>
+
 namespace egihash
 {
 	bool test_function();
+
+	struct dag
+	{
+		using size_type = ::std::size_t;
+		using progress_callback_type = ::std::function<size_type (size_type)>;
+
+		dag(const dag &) = default;
+		dag & operator=(const dag &) = default;
+		~dag() = default;
+
+		dag() = delete;
+		dag(dag &&) = delete;
+		dag & operator=(dag &&) = delete;
+
+		dag(uint64_t const block_number, progress_callback_type = [](size_type){ return 0; });
+		dag(::std::string const & file_path);
+
+		uint64_t epoch() const;
+		size_type size() const;
+		void const * data() const;
+		void save(::std::string const & file_path) const;
+
+		struct impl;
+		::std::shared_ptr<impl> m_impl;
+	};
 }
 
 extern "C"
