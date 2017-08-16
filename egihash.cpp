@@ -468,8 +468,70 @@ namespace egihash
 
 		void load(::std::string const & file_path) const
 		{
-			// TODO: implement me
-			(void)file_path;
+			using namespace std;
+			ifstream fs;
+			fs.open(file_path, ios::in | ios::binary);
+			uint64_t unused = 0;
+
+			auto read = [fs](void * dst, size_type count)
+			{
+				// TODO: read values in as little endian
+				fs.read(reintepret_cast<char *>(dst), count);
+			};
+
+			static constexpr size_t magic_size = 12;
+			char magic[magic_size] = {0};
+			read(magic, magic_size - 1);
+			read(&unused, 1);
+
+			if (std::string(magic) != "EGIHASH_DAG")
+			{
+				throw hash_exception("Not a DAG file");
+			}
+
+			uint32_t major = 0, revision = 0, minor = 0;
+			read(&major, sizeof(major));
+			read(&revision, sizeof(revision));
+			read(&minor, sizeof(minor));
+			if ((major != constants::MAJOR_VERSION) || (revision != constants::REVISION))
+			{
+				throw hash_exception("DAG version is invalid");
+			}
+
+			uint64_t cache_begin = 0, cache_end = 0, dag_begin = 0, dag_end = 0;
+			uint8_t unused = 0;
+			read(&epoch, sizeof(epoch));
+			read(&cache_begin, sizeof(cache_begin));
+			read(&cache_end, sizeof(cache_end));
+			read(&dag_begin, sizeof(dag_begin));
+			read(&dag_end, sizeof(dag_end));
+			read(&unused, 1);
+
+			// validate size of cache
+			cache_t::size_type cache_size = cache_t::get_cache_size((epoch * constants::EPOCH_LENGTH) + 1);
+			if ((cache_end <= cache_begin) || (cache_size != (cache_end - cache_begin)))
+			{
+				throw hash_exception("DAG cache is corrupt");
+			}
+
+			// validate size of DAG
+			size = get_full_size((epoch * constants::EPOCH_LENGTH) + 1); // get the correct dag size
+			if ((dag_end <= dag_begin) || (size != (dag_end - dag_begin)))
+			{
+				throw hash_exception("DAG is corrupt");
+			}
+
+			// load the cache
+			cache.load(fs, cache_begin, cache_end);
+
+			// load the DAG
+			dag_hash_count = size / constants::HASH_BYTES;
+			data.resize(dag_hash_count);
+			for (auto i : data)
+			{
+				i.resize(constants::HASH_BYTES / constants::WORD_BYTES);
+				read(&i[0], constants::HASH_BYTES);
+			}
 		}
 
 		void generate(progress_callback_type callback)
