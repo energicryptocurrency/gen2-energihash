@@ -10,6 +10,7 @@
 
 #include <functional>
 #include <memory>
+#include <type_traits>
 #include <vector>
 
 namespace egihash
@@ -18,6 +19,7 @@ namespace egihash
 
 	// TODO: randomized seedhash not zero seedhash
 	static constexpr char epoch0_seedhash[] = "\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00";
+	static_assert(sizeof(epoch0_seedhash) == 33, "Invalid seedhash");
 	::std::string get_seedhash(uint64_t const block_number);
 
 	struct h256_t
