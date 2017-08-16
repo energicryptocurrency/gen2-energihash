@@ -518,7 +518,6 @@ namespace egihash
 	::std::shared_ptr<dag::impl> get_dag(uint64_t block_number, dag::progress_callback_type callback)
 	{
 		using namespace std;
-		shared_ptr<dag::impl> impl;
 		uint64_t epoch_number = block_number / constants::EPOCH_LENGTH;
 
 		// if we have the correct DAG already loaded, return it from the cache
@@ -532,20 +531,28 @@ namespace egihash
 		}
 
 		// otherwise create the dag and add it to the cache
-		impl.reset(new dag::impl(block_number, callback));
+		// this is not locked as it can be a lengthy process and we don't want to block access to the dag cache
+		shared_ptr<dag::impl> impl(new dag::impl(block_number, callback));
 
 		lock_guard<mutex> lock(dag_cache_mutex);
 		auto insert_pair = dag_cache.insert(make_pair(epoch_number, impl));
+
+		// if insert succeded, return the dag
 		if (insert_pair.second)
 		{
 			return insert_pair.first->second;
 		}
-		else
+
+		impl.reset();
+
+		// if insert failed, it's probably already been inserted
+		auto const dag_cache_iterator = dag_cache.find(epoch_number);
+		if (dag_cache_iterator != dag_cache.end())
 		{
-			// TODO: this dag has already been inserted.. should we notify the caller?
+			return dag_cache_iterator->second;
 		}
 
-		return impl;
+		throw hash_exception("Could not get DAG");
 	}
 
 	::std::shared_ptr<dag::impl> get_dag(::std::string const & file_path)
