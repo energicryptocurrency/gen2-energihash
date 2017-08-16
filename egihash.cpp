@@ -423,28 +423,35 @@ namespace egihash
 			ofstream fs;
 			fs.open(file_path, ios::out | ios::binary);
 
+			static constexpr uint64_t zero = 0;
 			uint64_t cache_begin = 57;
 			uint64_t cache_end = cache_begin + cache.size();
 			uint64_t dag_begin = cache_end + 1;
 			uint64_t dag_end = dag_begin + size;
 
-			// TODO: write all values in little endian
-			fs << "EGIHASH_DAG"
-				<< 0
-				<< constants::MAJOR_VERSION
-				<< constants::REVISION
-				<< constants::MINOR_VERSION
-				<< cache_begin
-				<< cache_end
-				<< dag_begin
-				<< dag_end
-				<< 0;
+			auto write = [fs](void const * data, size_type count)
+			{
+				// TODO: write all value in little endian
+				fs.write(reinterpret_cast<char const *>(data), count);
+			};
+
+			fs << "EGIHASH_DAG";
+			write(&zero, 1);
+			write(&constants::MAJOR_VERSION, sizeof(constants::MAJOR_VERSION));
+			write(&constants::REVISION, sizeof(constants::REVISION));
+			write(&constants::MINOR_VERSION, sizeof(constants::MINOR_VERSION));
+			write(&epoch, sizeof(epoch));
+			write(&cache_begin, sizeof(cache_begin));
+			write(&cache_end, sizeof(cache_end));
+			write(&dag_begin, sizeof(dag_begin));
+			write(&dag_end, sizeof(dag_end));
+			write(&zero, 1);
 
 			for (auto const i : cache.data())
 			{
 				for (auto const j : i)
 				{
-					fs << j;
+					write(&j, sizeof(j));
 				}
 			}
 
@@ -452,7 +459,7 @@ namespace egihash
 			{
 				for (auto const j : i)
 				{
-					fs << j;
+					write(&j, sizeof(j));
 				}
 			}
 
