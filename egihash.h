@@ -20,20 +20,35 @@ namespace egihash
 	static constexpr char epoch0_seedhash[] = "\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00";
 	::std::string get_seedhash(uint64_t const block_number);
 
-	struct cache
+	struct h256_t
+	{
+		h256_t();
+		// TODO: copy/move ctors/operators & operator bool()
+		uint8_t b[32];
+	};
+
+	struct result_t
+	{
+		result_t() = default;
+		// TODO: copy/move ctors/operators & operator bool()
+		h256_t value;
+		h256_t mixhash;
+	};
+
+	struct cache_t
 	{
 		using size_type = ::std::size_t;
 		using data_type = ::std::vector<::std::vector<int32_t>>;
 
-		cache(const cache &) = default;
-		cache & operator=(cache const &) = default;
-		~cache() = default;
+		cache_t(const cache_t &) = default;
+		cache_t & operator=(cache_t const &) = default;
+		cache_t(cache_t &&) = default;
+		cache_t & operator=(cache_t &&) = default;
+		~cache_t() = default;
 
-		cache() = delete;
-		cache(cache &&) = delete;
-		cache & operator=(cache &&) = delete;
+		cache_t() = delete;
 
-		cache(uint64_t block_number, ::std::string const & seed);
+		cache_t(uint64_t block_number, ::std::string const & seed);
 
 		uint64_t epoch() const;
 		size_type size() const;
@@ -53,11 +68,11 @@ namespace egihash
 
 		dag(dag const &) = default;
 		dag & operator=(dag const &) = default;
+		dag(dag &&) = default;
+		dag & operator=(dag &&) = default;
 		~dag() = default;
 
 		dag() = delete;
-		dag(dag &&) = delete;
-		dag & operator=(dag &&) = delete;
 
 		dag(uint64_t const block_number, progress_callback_type = [](size_type){ return 0; });
 		dag(::std::string const & file_path);
@@ -67,7 +82,7 @@ namespace egihash
 		data_type const & data() const;
 		void save(::std::string const & file_path) const;
 
-		cache get_cache() const;
+		cache_t get_cache() const;
 
 		static size_type get_full_size(uint64_t const block_number) noexcept;
 
@@ -92,6 +107,7 @@ typedef struct EGIHASH_NAMESPACE(full) * EGIHASH_NAMESPACE(full_t);
 typedef struct EGIHASH_NAMESPACE(h256) { uint8_t b[32]; } EGIHASH_NAMESPACE(h256_t);
 typedef struct EGIHASH_NAMESPACE(result) { EGIHASH_NAMESPACE(h256_t) value; EGIHASH_NAMESPACE(h256_t) mixhash; } EGIHASH_NAMESPACE(result_t);
 
+#if 0 // TODO: FIXME
 EGIHASH_NAMESPACE(light_t) EGIHASH_NAMESPACE(light_new)(unsigned int block_number);
 EGIHASH_NAMESPACE(result_t) EGIHASH_NAMESPACE(light_compute)(EGIHASH_NAMESPACE(light_t) light, EGIHASH_NAMESPACE(h256_t) header_hash, uint64_t nonce);
 void EGIHASH_NAMESPACE(light_delete)(EGIHASH_NAMESPACE(light_t) light);
@@ -103,6 +119,7 @@ EGIHASH_NAMESPACE(result_t) EGIHASH_NAMESPACE(full_compute)(EGIHASH_NAMESPACE(fu
 void EGIHASH_NAMESPACE(full_delete)(EGIHASH_NAMESPACE(full_t) full);
 
 void egihash_h256_compute(EGIHASH_NAMESPACE(h256_t) * output_hash, void * input_data, uint64_t input_size);
+#endif
 
 #ifdef __cplusplus
 } // extern "C"

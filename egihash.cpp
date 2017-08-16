@@ -256,6 +256,12 @@ namespace
 
 namespace egihash
 {
+	h256_t::h256_t()
+	: b{0}
+	{
+
+	}
+
 	// TODO: unit tests / validation
 	template <typename T>
 	sha3_512_t::deserialized_hash_t sha3_512(T const & data)
@@ -299,70 +305,9 @@ namespace egihash
 		return s;
 	}
 
-	// TODO: unit tests / validation
-	decltype(auto) hashimoto(sha3_256_t::deserialized_hash_t const & header, uint64_t const nonce, size_t const full_size, ::std::function<sha3_512_t::deserialized_hash_t (size_t const)> lookup)
+	struct cache_t::impl_t
 	{
-		auto const n = full_size / constants::HASH_BYTES;
-		auto const w = constants::MIX_BYTES / constants::WORD_BYTES;
-		auto const mixhashes = constants::MIX_BYTES / constants::HASH_BYTES;
-
-		sha3_256_t::deserialized_hash_t header_seed(header);
-		for (size_t i = 0; i < 8; i++)
-		{
-			// TODO: nonce is big endian, this converts to little endian (do something sensible for big endian)
-			header_seed.push_back(reinterpret_cast<uint8_t const *>(&nonce)[7 - i]);
-		}
-		auto s = sha3_512(header_seed);
-		decltype(s) mix;
-		for (size_t i = 0; i < (constants::MIX_BYTES / constants::HASH_BYTES); i++)
-		{
-			mix.insert(mix.end(), s.begin(), s.end());
-		}
-
-		for (size_t i = 0; i < constants::ACCESSES; i++)
-		{
-			auto p = fnv(i ^ s[0], mix[i % w]) % (n / mixhashes) * mixhashes;
-			decltype(s) newdata;
-			for (size_t j = 0; j < (constants::MIX_BYTES / constants::HASH_BYTES); j++)
-			{
-				auto const & h = lookup(p + j);
-				newdata.insert(newdata.end(), h.begin(), h.end());
-			}
-			for (auto j = mix.begin(), jEnd = mix.end(), k = newdata.begin(), kEnd = newdata.end(); j != jEnd && k != kEnd; j++, k++)
-			{
-				*j = fnv(*j, *k);
-			}
-		}
-
-		decltype(s) cmix;
-		for (size_t i = 0; i < mix.size(); i += 4)
-		{
-			cmix.push_back(fnv(fnv(fnv(mix[i], mix[i+1]), mix[i+2]), mix[i+3]));
-		}
-
-		::std::shared_ptr<decltype(s)> shared_mix(::std::make_shared<decltype(s)>(std::move(cmix)));
-		::std::map<::std::string, decltype(shared_mix)> out;
-		out.insert(decltype(out)::value_type(::std::string("mix digest"), shared_mix));
-		s.insert(s.end(), shared_mix->begin(), shared_mix->end());
-		out.insert(decltype(out)::value_type(::std::string("result"), ::std::make_shared<decltype(s)>(sha3_256(s))));
-		return out;
-	}
-
-	// TODO: unit tests / validation
-	decltype(auto) hashimoto_light(size_t const full_size, ::std::vector<sha3_512_t::deserialized_hash_t> const cache, sha3_256_t::deserialized_hash_t const & header, uint64_t const nonce)
-	{
-		return hashimoto(header, nonce, full_size, [cache](size_t const x){return calc_dataset_item(cache, x);});
-	}
-
-	// TODO: unit tests / validation
-	decltype(auto) hashimoto_full(size_t const full_size, ::std::vector<sha3_512_t::deserialized_hash_t> const dataset, sha3_256_t::deserialized_hash_t const & header, uint64_t const nonce)
-	{
-		return hashimoto(header, nonce, full_size, [dataset](size_t const x){return dataset[x];});
-	}
-
-	struct cache::impl_t
-	{
-		using size_type = cache::size_type;
+		using size_type = cache_t::size_type;
 		using data_type = ::std::vector<::std::vector<int32_t>>;
 
 		impl_t(uint64_t const block_number, ::std::string const & seed)
@@ -418,27 +363,27 @@ namespace egihash
 		data_type data;
 	};
 
-	cache::cache(uint64_t const block_number, ::std::string const & seed)
+	cache_t::cache_t(uint64_t const block_number, ::std::string const & seed)
 	: impl(new impl_t(block_number, seed))
 	{
 	}
 
-	uint64_t cache::epoch() const
+	uint64_t cache_t::epoch() const
 	{
 		return impl->epoch;
 	}
 
-	cache::size_type cache::size() const
+	cache_t::size_type cache_t::size() const
 	{
 		return impl->size;
 	}
 
-	cache::data_type const & cache::data() const
+	cache_t::data_type const & cache_t::data() const
 	{
 		return impl->data;
 	}
 
-	cache::size_type cache::get_cache_size(uint64_t const block_number) noexcept
+	cache_t::size_type cache_t::get_cache_size(uint64_t const block_number) noexcept
 	{
 		return impl_t::get_cache_size(block_number);
 	}
@@ -495,7 +440,7 @@ namespace egihash
 			}
 		}
 
-		data_type::value_type calc_dataset_item(::std::vector<sha3_512_t::deserialized_hash_t> const & cache, size_type const i)
+		static data_type::value_type calc_dataset_item(::std::vector<sha3_512_t::deserialized_hash_t> const & cache, size_type const i)
 		{
 			size_type const n = cache.size();
 			constexpr size_type r = constants::HASH_BYTES / constants::WORD_BYTES;
@@ -518,7 +463,7 @@ namespace egihash
 			return sha3_512(mix);
 		}
 
-		cache get_cache() const
+		cache_t get_cache() const
 		{
 			return cache;
 		}
@@ -537,7 +482,7 @@ namespace egihash
 
 		uint64_t epoch;
 		size_type size;
-		cache cache;
+		cache_t cache;
 		data_type data;
 	};
 
@@ -625,7 +570,7 @@ namespace egihash
 		impl->save(file_path);
 	}
 
-	cache dag::get_cache() const
+	cache_t dag::get_cache() const
 	{
 		return impl->get_cache();
 	}
@@ -633,6 +578,73 @@ namespace egihash
 	dag::size_type dag::get_full_size(uint64_t const block_number) noexcept
 	{
 		return impl_t::get_full_size(block_number);
+	}
+
+	// TODO: unit tests / validation
+	result_t hashimoto(sha3_256_t::deserialized_hash_t const & header, uint64_t const nonce, size_t const full_size, ::std::function<sha3_512_t::deserialized_hash_t (size_t const)> lookup)
+	{
+		auto const n = full_size / constants::HASH_BYTES;
+		auto const w = constants::MIX_BYTES / constants::WORD_BYTES;
+		auto const mixhashes = constants::MIX_BYTES / constants::HASH_BYTES;
+
+		sha3_256_t::deserialized_hash_t header_seed(header);
+		for (size_t i = 0; i < 8; i++)
+		{
+			// TODO: nonce is big endian, this converts to little endian (do something sensible for big endian)
+			header_seed.push_back(reinterpret_cast<uint8_t const *>(&nonce)[7 - i]);
+		}
+		auto s = sha3_512(header_seed);
+		decltype(s) mix;
+		for (size_t i = 0; i < (constants::MIX_BYTES / constants::HASH_BYTES); i++)
+		{
+			mix.insert(mix.end(), s.begin(), s.end());
+		}
+
+		for (size_t i = 0; i < constants::ACCESSES; i++)
+		{
+			auto p = fnv(i ^ s[0], mix[i % w]) % (n / mixhashes) * mixhashes;
+			decltype(s) newdata;
+			for (size_t j = 0; j < (constants::MIX_BYTES / constants::HASH_BYTES); j++)
+			{
+				auto const & h = lookup(p + j);
+				newdata.insert(newdata.end(), h.begin(), h.end());
+			}
+			for (auto j = mix.begin(), jEnd = mix.end(), k = newdata.begin(), kEnd = newdata.end(); j != jEnd && k != kEnd; j++, k++)
+			{
+				*j = fnv(*j, *k);
+			}
+		}
+
+		decltype(s) cmix;
+		for (size_t i = 0; i < mix.size(); i += 4)
+		{
+			cmix.push_back(fnv(fnv(fnv(mix[i], mix[i+1]), mix[i+2]), mix[i+3]));
+		}
+
+		auto v = sha3_256(s);
+		result_t out;
+		::std::memcpy(&out.value.b[0], &v[0], ::std::min(sizeof(out.value.b), v.size()));
+		::std::memcpy(&out.mixhash.b[0], &cmix[0], ::std::min(sizeof(out.mixhash.b), cmix.size()));
+		return out;
+
+		//::std::shared_ptr<decltype(s)> shared_mix(::std::make_shared<decltype(s)>(std::move(cmix)));
+		//::std::map<::std::string, decltype(shared_mix)> out;
+		//out.insert(decltype(out)::value_type(::std::string("mix digest"), shared_mix));
+		//s.insert(s.end(), shared_mix->begin(), shared_mix->end());
+		//out.insert(decltype(out)::value_type(::std::string("result"), ::std::make_shared<decltype(s)>(sha3_256(s))));
+		//return out;
+	}
+
+	// TODO: unit tests / validation
+	result_t hashimoto_light(size_t const full_size, cache_t const & c, sha3_256_t::deserialized_hash_t const & header, uint64_t const nonce)
+	{
+		return hashimoto(header, nonce, full_size, [c](size_t const x){return dag::impl_t::calc_dataset_item(c.data(), x);});
+	}
+
+	// TODO: unit tests / validation
+	result_t hashimoto_full(size_t const full_size, dag const & dataset, sha3_256_t::deserialized_hash_t const & header, uint64_t const nonce)
+	{
+		return hashimoto(header, nonce, full_size, [dataset](size_t const x){return dataset.data()[x];});
 	}
 
 	bool test_function()
@@ -722,10 +734,11 @@ namespace egihash
 
 extern "C"
 {
+	#if 0 // TODO: FIXME
 	struct EGIHASH_NAMESPACE(light)
 	{
 		unsigned int block_number;
-		::egihash::cache cache;
+		::egihash::cache_t cache;
 
 		EGIHASH_NAMESPACE(light)(unsigned int block_number)
 		: block_number(block_number)
@@ -882,4 +895,5 @@ extern "C"
 			::std::memset(output_hash->b, 0, 32);
 		}
 	}
+	#endif
 }
