@@ -338,8 +338,7 @@ namespace egihash
 					size_t count = 0;
 					for (auto & k : u)
 					{
-						count++;
-						k = k ^ data[v][count];
+						k = k ^ data[v][count++];
 					}
 					data[i] = sha3_512(u);
 				}
