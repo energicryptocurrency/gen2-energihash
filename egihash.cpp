@@ -766,6 +766,11 @@ namespace egihash
 			cout << dec << "all tests passed" << endl;
 		}
 
+		cout << "Generating DAG" << endl;
+		auto dag_size = dag::get_full_size(0);
+		dag d(0, [dag_size](size_t i){ cout << "\rprogress " << static_cast<double>(i) / static_cast<double>(dag_size / constants::HASH_BYTES) * 100.0 << "%"; return 0; });
+		d.save("epoch0.dag");
+
 		return success;
 	}
 }
