@@ -908,7 +908,9 @@ namespace egihash
 				default:
 					break;
 			}
-			cout << fixed << setprecision(2) << static_cast<double>(step) / static_cast<double>(max) * 100.0 << "%" << flush;
+			cout << fixed << setprecision(2)
+			<< static_cast<double>(step) / static_cast<double>(max) * 100.0 << "%"
+			<< setfill(' ') << setw(80) << flush;
 
 			return true;
 		};
