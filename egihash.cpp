@@ -574,7 +574,8 @@ namespace egihash
 			for (size_type i = 0; i < n; i++)
 			{
 				data.push_back(calc_dataset_item(cache.data(), i));
-				if (callback(i) != 0)
+				// only call back once every 10000 iterations
+				if ((i % 10000) == 0 && (callback(i) != 0))
 				{
 					throw hash_exception("DAG creation cancelled.");
 				}
