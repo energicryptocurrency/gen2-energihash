@@ -430,10 +430,11 @@ namespace egihash
 			uint64_t dag_begin = cache_end + 1;
 			uint64_t dag_end = dag_begin + size;
 
-			auto write = [fs](void const * data, size_type count)
+			auto write = [&fs](void const * data, size_type count) -> bool
 			{
 				// TODO: write all value in little endian
 				fs.write(reinterpret_cast<char const *>(data), count);
+				return fs.good();
 			};
 
 			fs << constants::DAG_MAGIC_BYTES;
@@ -467,17 +468,18 @@ namespace egihash
 			fs.close();
 		}
 
-		void load(::std::string const & file_path) const
+		void load(::std::string const & file_path)
 		{
 			using namespace std;
 			ifstream fs;
 			fs.open(file_path, ios::in | ios::binary);
 			uint64_t unused = 0;
 
-			auto read = [fs](void * dst, size_type count)
+			auto read = [&fs](void * dst, size_type count) -> bool
 			{
 				// TODO: read values in as little endian
-				fs.read(reintepret_cast<char *>(dst), count);
+				fs.read(reinterpret_cast<char *>(dst), count);
+				return fs.good();
 			};
 
 			fs.seekg(0, ios::end);
@@ -510,7 +512,6 @@ namespace egihash
 			}
 
 			uint64_t cache_begin = 0, cache_end = 0, dag_begin = 0, dag_end = 0;
-			uint8_t unused = 0;
 			read(&epoch, sizeof(epoch));
 			read(&cache_begin, sizeof(cache_begin));
 			read(&cache_end, sizeof(cache_end));
@@ -520,23 +521,23 @@ namespace egihash
 
 			// validate size of cache
 			cache_t::size_type cache_size = cache_t::get_cache_size((epoch * constants::EPOCH_LENGTH) + 1);
-			if ((cache_end <= cache_begin) || (cache_size != (cache_end - cache_begin)) || (cache_end >= filesize))
+			if ((cache_end <= cache_begin) || (cache_size != (cache_end - cache_begin)) || (cache_end >= static_cast<size_type>(filesize)))
 			{
 				throw hash_exception("DAG cache is corrupt");
 			}
 
 			// validate size of DAG
 			size = get_full_size((epoch * constants::EPOCH_LENGTH) + 1); // get the correct dag size
-			if ((dag_end <= dag_begin) || (size != (dag_end - dag_begin)) || (dag_end > filesize))
+			if ((dag_end <= dag_begin) || (size != (dag_end - dag_begin)) || (dag_end > static_cast<size_type>(filesize)))
 			{
 				throw hash_exception("DAG is corrupt");
 			}
 
 			// load the cache
-			cache.load(fs, cache_begin, cache_end);
+			cache.load(read);
 
 			// load the DAG
-			dag_hash_count = size / constants::HASH_BYTES;
+			size_type dag_hash_count = size / constants::HASH_BYTES;
 			data.resize(dag_hash_count);
 			for (auto i : data)
 			{
