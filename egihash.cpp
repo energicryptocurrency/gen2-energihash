@@ -872,9 +872,9 @@ namespace egihash
 		}
 		#endif
 
-		cout << "Generating DAG" << endl;
+		cout << "Generating DAG...";
 		auto dag_size = dag::get_full_size(0);
-		dag d(0, [dag_size](size_t i){ cout << "\rprogress " << static_cast<double>(i) / static_cast<double>(dag_size / constants::HASH_BYTES) * 100.0 << "%"; return 0; });
+		dag d(0, [dag_size](size_t i){ cout << "\rGenerating DAG..." << static_cast<double>(i) / static_cast<double>(dag_size / constants::HASH_BYTES) / 10.0 << "%"; return 0; });
 		d.save("epoch0.dag");
 
 		return success;
