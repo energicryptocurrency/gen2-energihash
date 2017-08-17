@@ -334,7 +334,7 @@ namespace egihash
 			for (size_t i = 1; i < n; i++)
 			{
 				data.push_back(sha3_512(data.back()));
-				if (((i % constants::CALLBACK_FREQUENCY) == 0) && (callback(i) != 0))
+				if (((i % constants::CALLBACK_FREQUENCY) == 0) && (callback(i, n, cache_seeding) != 0))
 				{
 					throw hash_exception("Cache creation cancelled.");
 				}
@@ -352,7 +352,7 @@ namespace egihash
 						k = k ^ data[v][count++];
 					}
 					data[i] = sha3_512(u);
-					if (((i % constants::CALLBACK_FREQUENCY) == 0) && (callback(i) != 0))
+					if (((i % constants::CALLBACK_FREQUENCY) == 0) && (callback(i, n * constants::CACHE_ROUNDS, cache_generation) != 0))
 					{
 						throw hash_exception("Cache creation cancelled.");
 					}
@@ -582,7 +582,7 @@ namespace egihash
 			for (size_type i = 0; i < n; i++)
 			{
 				data.push_back(calc_dataset_item(cache.data(), i));
-				if ((i % constants::CALLBACK_FREQUENCY) == 0 && (callback(i) != 0))
+				if ((i % constants::CALLBACK_FREQUENCY) == 0 && (callback(i, n, dag_generation) != 0))
 				{
 					throw hash_exception("DAG creation cancelled.");
 				}
@@ -879,9 +879,40 @@ namespace egihash
 		}
 		#endif
 
-		cout << "Generating DAG...0%" << flush;
-		auto dag_size = dag::get_full_size(0);
-		dag d(0, [dag_size](size_t i){ cout << "\rGenerating DAG..." << ::std::fixed << ::std::setprecision(2) << static_cast<double>(i) / static_cast<double>(dag_size / constants::HASH_BYTES) * 100.0 << "%" << flush; return 0; });
+		auto progress = [](::std::size_t step, ::std::size_t max, int phase) -> bool
+		{
+			switch(phase)
+			{
+				case cache_seeding:
+					cout << "\rSeeding cache...";
+					break;
+				case cache_generation:
+					cout << "\rGenerating cache...";
+					break;
+				case cache_saving:
+					cout << "\rSaving cache...";
+					break;
+				case cache_loading:
+					cout << "\rLoading cache...";
+					break;
+				case dag_generation:
+					cout << "\rGenerating DAG...";
+					break;
+				case dag_saving:
+					cout << "\rSaving DAG...";
+					break;
+				case dag_loading:
+					cout << "\rLoading DAG...";
+					break;
+				default:
+					break;
+			}
+			cout << static_cast<double>(step) / static_cast<double>(max) * 100.0 << "%" << flush;
+
+			return true;
+		};
+
+		dag d(0, progress);
 		cout << endl << "Saving DAG..." << endl;
 		d.save("epoch0.dag");
 

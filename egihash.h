@@ -37,7 +37,18 @@ namespace egihash
 		h256_t mixhash;
 	};
 
-	using progress_callback_type = ::std::function<::std::size_t (::std::size_t)>;
+	enum progress_callback_phase
+	{
+		cache_seeding,
+		cache_generation,
+		cache_saving,
+		cache_loading,
+		dag_generation,
+		dag_saving,
+		dag_loading
+	};
+
+	using progress_callback_type = ::std::function<bool (::std::size_t /* step */, ::std::size_t /* max */, progress_callback_phase /* phase */)>;
 
 	struct cache_t
 	{
@@ -52,7 +63,7 @@ namespace egihash
 
 		cache_t() = delete;
 
-		cache_t(uint64_t block_number, ::std::string const & seed, progress_callback_type = [](size_type){ return 0; });
+		cache_t(uint64_t block_number, ::std::string const & seed, progress_callback_type = [](size_type, size_type, int){ return true; });
 
 		uint64_t epoch() const;
 		size_type size() const;
@@ -78,7 +89,7 @@ namespace egihash
 
 		dag() = delete;
 
-		dag(uint64_t const block_number, progress_callback_type = [](size_type){ return 0; });
+		dag(uint64_t const block_number, progress_callback_type = [](size_type, size_type, int){ return true; });
 		dag(::std::string const & file_path);
 
 		uint64_t epoch() const;
