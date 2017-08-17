@@ -30,6 +30,7 @@ namespace
 {
 	namespace constants
 	{
+		constexpr char DAG_MAGIC_BYTES[] = "EGIHASH_DAG";
 		constexpr uint32_t MAJOR_VERSION = 1u;
 		constexpr uint32_t REVISION = 23u;
 		constexpr uint32_t MINOR_VERSION = 0u;
@@ -424,7 +425,7 @@ namespace egihash
 			fs.open(file_path, ios::out | ios::binary);
 
 			static constexpr uint64_t zero = 0;
-			uint64_t cache_begin = 57;
+			uint64_t cache_begin = strlen(constants::DAG_MAGIC_BYTES) + sizeof(constants::MAJOR_VERSION) + sizeof(constants::REVISION) + sizeof(constants::MINOR_VERSION) + (5 * sizeof(epoch)) + 1;
 			uint64_t cache_end = cache_begin + cache.size();
 			uint64_t dag_begin = cache_end + 1;
 			uint64_t dag_end = dag_begin + size;
@@ -435,7 +436,7 @@ namespace egihash
 				fs.write(reinterpret_cast<char const *>(data), count);
 			};
 
-			fs << "EGIHASH_DAG";
+			fs << constants::DAG_MAGIC_BYTES;
 			write(&zero, 1);
 			write(&constants::MAJOR_VERSION, sizeof(constants::MAJOR_VERSION));
 			write(&constants::REVISION, sizeof(constants::REVISION));
@@ -484,7 +485,7 @@ namespace egihash
 			read(magic, magic_size - 1);
 			read(&unused, 1);
 
-			if (std::string(magic) != "EGIHASH_DAG")
+			if (std::string(magic) != constants::DAG_MAGIC_BYTES)
 			{
 				throw hash_exception("Not a DAG file");
 			}
