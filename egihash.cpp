@@ -361,15 +361,20 @@ namespace egihash
 			}
 		}
 
-		void load(::std::function<bool(void *, size_type)> read)
+		void load(::std::function<bool(void *, size_type)> read, progress_callback_type callback)
 		{
 			size_type const cache_hash_count = size / constants::HASH_BYTES;
 
 			data.resize(cache_hash_count);
+			size_t count = 0;
 			for (auto i : data)
 			{
 				i.resize(constants::HASH_BYTES);
 				read(&i[0], constants::HASH_BYTES);
+				if (((++count % constants::CALLBACK_FREQUENCY) == 0) && !callback(count, cache_hash_count, cache_loading))
+				{
+					throw hash_exception("Cache loading cancelled.");
+				}
 			}
 		}
 
@@ -410,9 +415,9 @@ namespace egihash
 		return impl->data;
 	}
 
-	void cache_t::load(::std::function<bool(void *, size_type)> read)
+	void cache_t::load(::std::function<bool(void *, size_type)> read, progress_callback_type callback)
 	{
-		impl->load(read);
+		impl->load(read, callback);
 	}
 
 	cache_t::size_type cache_t::get_cache_size(uint64_t const block_number) noexcept
@@ -436,16 +441,16 @@ namespace egihash
 			generate(callback);
 		}
 
-		impl_t(::std::string const & file_path)
+		impl_t(::std::string const & file_path, progress_callback_type callback)
 		: epoch(max_epoch)
 		, size(0)
 		, cache(max_epoch, "") // TODO: fixme
 		, data()
 		{
-			load(file_path);
+			load(file_path, callback);
 		}
 
-		void save(::std::string const & file_path) const
+		void save(::std::string const & file_path, progress_callback_type callback) const
 		{
 			using namespace std;
 			ofstream fs;
@@ -476,11 +481,17 @@ namespace egihash
 			write(&dag_end, sizeof(dag_end));
 			write(&zero, 1);
 
+			size_t max_count = cache.size() + data.size();
+			size_t count = 0;
 			for (auto const i : cache.data())
 			{
 				for (auto const j : i)
 				{
 					write(&j, sizeof(j));
+				}
+				if (((++count % constants::CALLBACK_FREQUENCY) == 0) && !callback(count, max_count, dag_saving))
+				{
+					throw hash_exception("DAG save cancelled.");
 				}
 			}
 
@@ -490,12 +501,16 @@ namespace egihash
 				{
 					write(&j, sizeof(j));
 				}
+				if (((++count % constants::CALLBACK_FREQUENCY) == 0) && !callback(count, max_count, dag_saving))
+				{
+					throw hash_exception("DAG save cancelled.");
+				}
 			}
 
 			fs.close();
 		}
 
-		void load(::std::string const & file_path)
+		void load(::std::string const & file_path, progress_callback_type callback)
 		{
 			using namespace std;
 			ifstream fs;
@@ -564,15 +579,20 @@ namespace egihash
 			cache.impl->size = cache_size;
 
 			// load the cache
-			cache.load(read);
+			cache.load(read, callback);
 
 			// load the DAG
 			size_type dag_hash_count = size / constants::HASH_BYTES;
 			data.resize(dag_hash_count);
+			size_t count = 0;
 			for (auto i : data)
 			{
 				i.resize(constants::HASH_BYTES / constants::WORD_BYTES);
 				read(&i[0], constants::HASH_BYTES);
+				if (((++count % constants::CALLBACK_FREQUENCY) == 0) && !callback(count, data.size(), dag_loading))
+				{
+					throw hash_exception("DAG loading cancelled.");
+				}
 			}
 		}
 
@@ -677,13 +697,14 @@ namespace egihash
 		throw hash_exception("Could not get DAG");
 	}
 
-	::std::shared_ptr<dag::impl_t> get_dag(::std::string const & file_path)
+	::std::shared_ptr<dag::impl_t> get_dag(::std::string const & file_path, progress_callback_type callback)
 	{
 		using namespace std;
 		shared_ptr<dag::impl_t> impl;
 
 		// TODO: implement me
 		(void)file_path;
+		(void)callback;
 
 		return impl;
 	}
@@ -693,8 +714,8 @@ namespace egihash
 	{
 	}
 
-	dag::dag(::std::string const & file_path)
-	: impl(get_dag(file_path))
+	dag::dag(::std::string const & file_path, progress_callback_type callback)
+	: impl(get_dag(file_path, callback))
 	{
 
 	}
@@ -714,9 +735,9 @@ namespace egihash
 		return impl->data;
 	}
 
-	void dag::save(::std::string const & file_path) const
+	void dag::save(::std::string const & file_path, progress_callback_type callback) const
 	{
-		impl->save(file_path);
+		impl->save(file_path, callback);
 	}
 
 	cache_t dag::get_cache() const
