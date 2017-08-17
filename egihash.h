@@ -68,7 +68,7 @@ namespace egihash
 		uint64_t epoch() const;
 		size_type size() const;
 		data_type const & data() const;
-		void load(::std::function<bool(void *, size_type)> read);
+		void load(::std::function<bool(void *, size_type)> read, progress_callback_type = [](size_type, size_type, int){ return true; });
 
 		static size_type get_cache_size(uint64_t const block_number) noexcept;
 
@@ -90,12 +90,12 @@ namespace egihash
 		dag() = delete;
 
 		dag(uint64_t const block_number, progress_callback_type = [](size_type, size_type, int){ return true; });
-		dag(::std::string const & file_path);
+		dag(::std::string const & file_path, progress_callback_type = [](size_type, size_type, int){ return true; });
 
 		uint64_t epoch() const;
 		size_type size() const;
 		data_type const & data() const;
-		void save(::std::string const & file_path) const;
+		void save(::std::string const & file_path, progress_callback_type = [](size_type, size_type, int){ return true; }) const;
 
 		cache_t get_cache() const;
 
