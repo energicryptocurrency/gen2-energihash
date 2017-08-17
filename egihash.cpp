@@ -340,6 +340,7 @@ namespace egihash
 				}
 			}
 
+			size_t progress_counter = 0;
 			for (size_t i = 0; i < constants::CACHE_ROUNDS; i++)
 			{
 				for (size_t j = 0; j < n; j++)
@@ -352,7 +353,7 @@ namespace egihash
 						k = k ^ data[v][count++];
 					}
 					data[i] = sha3_512(u);
-					if (((i % constants::CALLBACK_FREQUENCY) == 0) && !callback(i, n * constants::CACHE_ROUNDS, cache_generation))
+					if (((i % constants::CALLBACK_FREQUENCY) == 0) && !callback(progress_counter++, n * constants::CACHE_ROUNDS, cache_generation))
 					{
 						throw hash_exception("Cache creation cancelled.");
 					}
