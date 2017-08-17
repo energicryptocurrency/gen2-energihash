@@ -352,8 +352,14 @@ namespace egihash
 
 		void load(::std::function<bool(void *, size_type)> read)
 		{
-			// TODO: implement me
-			(void)read;
+			size_type const cache_hash_count = size / constants::HASH_BYTES;
+
+			data.resize(cache_hash_count);
+			for (auto i : data)
+			{
+				i.resize(constants::HASH_BYTES);
+				read(&i[0], constants::HASH_BYTES);
+			}
 		}
 
 		static size_type get_cache_size(uint64_t block_number) noexcept
@@ -543,6 +549,9 @@ namespace egihash
 			{
 				throw hash_exception("DAG is corrupt");
 			}
+
+			cache.impl->epoch = epoch;
+			cache.impl->size = cache_size;
 
 			// load the cache
 			cache.load(read);
