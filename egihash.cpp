@@ -31,6 +31,7 @@ namespace
 	namespace constants
 	{
 		constexpr char DAG_MAGIC_BYTES[] = "EGIHASH_DAG";
+		constexpr uint32_t DAG_FILE_HEADER_SIZE = sizeof(DAG_MAGIC_BYTES) + (5 * sizeof(uint64_t) + (3 * sizeof(uint32_t)) + 2;
 		constexpr uint32_t MAJOR_VERSION = 1u;
 		constexpr uint32_t REVISION = 23u;
 		constexpr uint32_t MINOR_VERSION = 0u;
@@ -442,9 +443,9 @@ namespace egihash
 			fs.open(file_path, ios::out | ios::binary);
 
 			static constexpr uint64_t zero = 0;
-			uint64_t cache_begin = strlen(constants::DAG_MAGIC_BYTES) + sizeof(constants::MAJOR_VERSION) + sizeof(constants::REVISION) + sizeof(constants::MINOR_VERSION) + (5 * sizeof(epoch)) + 1;
+			uint64_t cache_begin = constants::DAG_FILE_HEADER_SIZE;
 			uint64_t cache_end = cache_begin + cache.size();
-			uint64_t dag_begin = cache_end + 1;
+			uint64_t dag_begin = cache_end;
 			uint64_t dag_end = dag_begin + size;
 
 			auto write = [&fs](void const * data, size_type count) -> bool
