@@ -350,6 +350,12 @@ namespace egihash
 			}
 		}
 
+		void load(::std::function<bool(void *, size_type)> read)
+		{
+			// TODO: implement me
+			(void)read;
+		}
+
 		static size_type get_cache_size(uint64_t block_number) noexcept
 		{
 			using namespace constants;
@@ -385,6 +391,11 @@ namespace egihash
 	cache_t::data_type const & cache_t::data() const
 	{
 		return impl->data;
+	}
+
+	void cache_t::load(::std::function<bool(void *, size_type)> read)
+	{
+		impl->load(read);
 	}
 
 	cache_t::size_type cache_t::get_cache_size(uint64_t const block_number) noexcept

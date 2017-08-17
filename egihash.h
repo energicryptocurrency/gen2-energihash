@@ -55,6 +55,7 @@ namespace egihash
 		uint64_t epoch() const;
 		size_type size() const;
 		data_type const & data() const;
+		void load(::std::function<bool(void *, size_type)> read);
 
 		static size_type get_cache_size(uint64_t const block_number) noexcept;
 
