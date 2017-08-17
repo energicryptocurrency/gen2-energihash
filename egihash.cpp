@@ -32,6 +32,7 @@ namespace
 	{
 		constexpr char DAG_MAGIC_BYTES[] = "EGIHASH_DAG";
 		constexpr uint32_t DAG_FILE_HEADER_SIZE = sizeof(DAG_MAGIC_BYTES) + (5 * sizeof(uint64_t)) + (3 * sizeof(uint32_t)) + 2;
+		constexpr uint32_t CALLBACK_FREQUENCY = 1u;
 		constexpr uint32_t MAJOR_VERSION = 1u;
 		constexpr uint32_t REVISION = 23u;
 		constexpr uint32_t MINOR_VERSION = 0u;
@@ -316,15 +317,15 @@ namespace egihash
 		using size_type = cache_t::size_type;
 		using data_type = ::std::vector<::std::vector<int32_t>>;
 
-		impl_t(uint64_t const block_number, ::std::string const & seed)
+		impl_t(uint64_t const block_number, ::std::string const & seed, progress_callback_type callback)
 		: epoch(block_number / constants::EPOCH_LENGTH)
 		, size(get_cache_size(block_number))
 		, data()
 		{
-			mkcache(seed);
+			mkcache(seed, callback);
 		}
 
-		void mkcache(::std::string const & seed)
+		void mkcache(::std::string const & seed, progress_callback_type callback)
 		{
 			size_t n = size / constants::HASH_BYTES;
 
@@ -333,6 +334,10 @@ namespace egihash
 			for (size_t i = 1; i < n; i++)
 			{
 				data.push_back(sha3_512(data.back()));
+				if (((i % constants::CALLBACK_FREQUENCY) == 0) && (callback(i) != 0))
+				{
+					throw hash_exception("Cache creation cancelled.");
+				}
 			}
 
 			for (size_t i = 0; i < constants::CACHE_ROUNDS; i++)
@@ -347,6 +352,10 @@ namespace egihash
 						k = k ^ data[v][count++];
 					}
 					data[i] = sha3_512(u);
+					if (((i % constants::CALLBACK_FREQUENCY) == 0) && (callback(i) != 0))
+					{
+						throw hash_exception("Cache creation cancelled.");
+					}
 				}
 			}
 		}
@@ -380,8 +389,8 @@ namespace egihash
 		data_type data;
 	};
 
-	cache_t::cache_t(uint64_t const block_number, ::std::string const & seed)
-	: impl(new impl_t(block_number, seed))
+	cache_t::cache_t(uint64_t const block_number, ::std::string const & seed, progress_callback_type callback)
+	: impl(new impl_t(block_number, seed, callback))
 	{
 	}
 
@@ -413,7 +422,6 @@ namespace egihash
 	struct dag::impl_t
 	{
 		using size_type = dag::size_type;
-		using progress_callback_type = dag::progress_callback_type;
 		using data_type = ::std::vector<::std::vector<int32_t>>;
 		using dag_cache_map = ::std::map<uint64_t /* epoch */, ::std::shared_ptr<impl_t>>;
 		static constexpr uint64_t max_epoch = ::std::numeric_limits<uint64_t>::max();
@@ -421,7 +429,7 @@ namespace egihash
 		impl_t(uint64_t block_number, progress_callback_type callback)
 		: epoch(block_number / constants::EPOCH_LENGTH)
 		, size(get_full_size(block_number))
-		, cache(block_number, get_seedhash(block_number))
+		, cache(block_number, get_seedhash(block_number), callback)
 		, data()
 		{
 			generate(callback);
@@ -574,8 +582,7 @@ namespace egihash
 			for (size_type i = 0; i < n; i++)
 			{
 				data.push_back(calc_dataset_item(cache.data(), i));
-				// only call back once every 10000 iterations
-				if ((i % 10000) == 0 && (callback(i) != 0))
+				if ((i % constants::CALLBACK_FREQUENCY) == 0 && (callback(i) != 0))
 				{
 					throw hash_exception("DAG creation cancelled.");
 				}
@@ -630,7 +637,7 @@ namespace egihash
 	static dag::impl_t::dag_cache_map dag_cache;
 	static ::std::mutex dag_cache_mutex;
 
-	::std::shared_ptr<dag::impl_t> get_dag(uint64_t block_number, dag::progress_callback_type callback)
+	::std::shared_ptr<dag::impl_t> get_dag(uint64_t block_number, progress_callback_type callback)
 	{
 		using namespace std;
 		uint64_t epoch_number = block_number / constants::EPOCH_LENGTH;
@@ -872,9 +879,10 @@ namespace egihash
 		}
 		#endif
 
-		cout << "Generating DAG...";
+		cout << "Generating DAG...0%" << flush;
 		auto dag_size = dag::get_full_size(0);
-		dag d(0, [dag_size](size_t i){ cout << "\rGenerating DAG..." << static_cast<double>(i) / static_cast<double>(dag_size / constants::HASH_BYTES) / 10.0 << "%"; return 0; });
+		dag d(0, [dag_size](size_t i){ cout << "\rGenerating DAG..." << ::std::fixed << ::std::setprecision(2) << static_cast<double>(i) / static_cast<double>(dag_size / constants::HASH_BYTES) * 100.0 << "%" << flush; return 0; });
+		cout << endl << "Saving DAG..." << endl;
 		d.save("epoch0.dag");
 
 		return success;
