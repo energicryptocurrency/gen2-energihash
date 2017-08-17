@@ -480,7 +480,17 @@ namespace egihash
 				fs.read(reintepret_cast<char *>(dst), count);
 			};
 
-			static constexpr size_t magic_size = 12;
+			fs.seekg(0, ios::end);
+			auto filesize = fs.tellg();
+			fs.seekg(0, ios::beg);
+
+			// check minimum dag size
+			if (filesize < 1090516865) // TODO: make a variable for the header size
+			{
+				throw hash_exception("DAG is corrupt");
+			}
+
+			static constexpr size_t magic_size = sizeof(constants::DAG_MAGIC_BYTES);
 			char magic[magic_size] = {0};
 			read(magic, magic_size - 1);
 			read(&unused, 1);
@@ -510,14 +520,14 @@ namespace egihash
 
 			// validate size of cache
 			cache_t::size_type cache_size = cache_t::get_cache_size((epoch * constants::EPOCH_LENGTH) + 1);
-			if ((cache_end <= cache_begin) || (cache_size != (cache_end - cache_begin)))
+			if ((cache_end <= cache_begin) || (cache_size != (cache_end - cache_begin)) || (cache_end >= filesize))
 			{
 				throw hash_exception("DAG cache is corrupt");
 			}
 
 			// validate size of DAG
 			size = get_full_size((epoch * constants::EPOCH_LENGTH) + 1); // get the correct dag size
-			if ((dag_end <= dag_begin) || (size != (dag_end - dag_begin)))
+			if ((dag_end <= dag_begin) || (size != (dag_end - dag_begin)) || (dag_end > filesize))
 			{
 				throw hash_exception("DAG is corrupt");
 			}
