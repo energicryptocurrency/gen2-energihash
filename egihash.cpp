@@ -334,7 +334,7 @@ namespace egihash
 			for (size_t i = 1; i < n; i++)
 			{
 				data.push_back(sha3_512(data.back()));
-				if (((i % constants::CALLBACK_FREQUENCY) == 0) && (callback(i, n, cache_seeding) != 0))
+				if (((i % constants::CALLBACK_FREQUENCY) == 0) && !callback(i, n, cache_seeding))
 				{
 					throw hash_exception("Cache creation cancelled.");
 				}
@@ -352,7 +352,7 @@ namespace egihash
 						k = k ^ data[v][count++];
 					}
 					data[i] = sha3_512(u);
-					if (((i % constants::CALLBACK_FREQUENCY) == 0) && (callback(i, n * constants::CACHE_ROUNDS, cache_generation) != 0))
+					if (((i % constants::CALLBACK_FREQUENCY) == 0) && !callback(i, n * constants::CACHE_ROUNDS, cache_generation))
 					{
 						throw hash_exception("Cache creation cancelled.");
 					}
@@ -582,7 +582,7 @@ namespace egihash
 			for (size_type i = 0; i < n; i++)
 			{
 				data.push_back(calc_dataset_item(cache.data(), i));
-				if ((i % constants::CALLBACK_FREQUENCY) == 0 && (callback(i, n, dag_generation) != 0))
+				if ((i % constants::CALLBACK_FREQUENCY) == 0 && !callback(i, n, dag_generation))
 				{
 					throw hash_exception("DAG creation cancelled.");
 				}
