@@ -31,7 +31,7 @@ namespace
 	namespace constants
 	{
 		constexpr char DAG_MAGIC_BYTES[] = "EGIHASH_DAG";
-		constexpr uint32_t DAG_FILE_HEADER_SIZE = sizeof(DAG_MAGIC_BYTES) + (5 * sizeof(uint64_t) + (3 * sizeof(uint32_t)) + 2;
+		constexpr uint32_t DAG_FILE_HEADER_SIZE = sizeof(DAG_MAGIC_BYTES) + (5 * sizeof(uint64_t)) + (3 * sizeof(uint32_t)) + 2;
 		constexpr uint32_t MAJOR_VERSION = 1u;
 		constexpr uint32_t REVISION = 23u;
 		constexpr uint32_t MINOR_VERSION = 0u;
