@@ -746,7 +746,7 @@ namespace egihash
 
 		// otherwise create the dag and add it to the cache
 		// this is not locked as it can be a lengthy process and we don't want to block access to the dag cache
-		shared_ptr<dag::impl_t> impl(new dag::impl_t(read, header, callback));
+		shared_ptr<dag_t::impl_t> impl(new dag_t::impl_t(read, header, callback));
 
 		lock_guard<mutex> lock(dag_cache_mutex);
 		auto insert_pair = dag_cache.insert(make_pair(header.epoch, impl));
