@@ -52,6 +52,7 @@ namespace
 	struct dag_file_header_t
 	{
 		static constexpr size_t magic_size = sizeof(constants::DAG_MAGIC_BYTES);
+		using size_type = ::egihash::dag_t::size_type;
 
 		char magic[magic_size];
 		uint32_t major_version;
@@ -87,7 +88,7 @@ namespace
 
 			if (std::string(magic) != constants::DAG_MAGIC_BYTES)
 			{
-				throw hash_exception("Not a DAG file");
+				throw ::egihash::hash_exception("Not a DAG file");
 			}
 
 			read(&major, sizeof(major));
@@ -95,7 +96,7 @@ namespace
 			read(&minor, sizeof(minor));
 			if ((major != constants::MAJOR_VERSION) || (revision != constants::REVISION))
 			{
-				throw hash_exception("DAG version is invalid");
+				throw ::egihash::hash_exception("DAG version is invalid");
 			}
 
 			read(&epoch, sizeof(epoch));
@@ -109,14 +110,14 @@ namespace
 			cache_t::size_type cache_size = cache_t::get_cache_size((epoch * constants::EPOCH_LENGTH) + 1);
 			if ((cache_end <= cache_begin) || (cache_size != (cache_end - cache_begin)) || (cache_end >= static_cast<size_type>(filesize)))
 			{
-				throw hash_exception("DAG cache is corrupt");
+				throw ::egihash::hash_exception("DAG cache is corrupt");
 			}
 
 			// validate size of DAG
 			size = get_full_size((epoch * constants::EPOCH_LENGTH) + 1); // get the correct dag size
 			if ((dag_end <= dag_begin) || (size != (dag_end - dag_begin)) || (dag_end > static_cast<size_type>(filesize)))
 			{
-				throw hash_exception("DAG is corrupt");
+				throw ::egihash::hash_exception("DAG is corrupt");
 			}
 		}
 	};
@@ -223,7 +224,7 @@ namespace
 		{
 			if (HashFunction(data, hash_size, reinterpret_cast<uint8_t const *>(input), input_size) != 0)
 			{
-				throw hash_exception("Unable to compute hash"); // TODO: better message?
+				throw ::egihash::hash_exception("Unable to compute hash"); // TODO: better message?
 			}
 		}
 
