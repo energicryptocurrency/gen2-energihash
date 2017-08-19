@@ -13,17 +13,12 @@ extern "C"
 #include <cmath>
 #include <cstring>
 #include <fstream>
-#include <functional>
 #include <iomanip>
 #include <limits>
 #include <map>
-#include <memory>
 #include <mutex>
-#include <stdexcept>
 #include <string>
 #include <sstream>
-#include <vector>
-#include <type_traits>
 #include <iostream> // TODO: remove me (debugging)
 
 namespace
