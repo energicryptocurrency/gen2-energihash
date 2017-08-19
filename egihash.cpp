@@ -502,9 +502,9 @@ namespace egihash
 		return impl_t::get_cache_size(block_number);
 	}
 
-	struct dag::impl_t
+	struct dag_t::impl_t
 	{
-		using size_type = dag::size_type;
+		using size_type = dag_t::size_type;
 		using data_type = ::std::vector<::std::vector<int32_t>>;
 		using dag_cache_map = ::std::map<uint64_t /* epoch */, ::std::shared_ptr<impl_t>>;
 		static constexpr uint64_t max_epoch = ::std::numeric_limits<uint64_t>::max();
@@ -665,10 +665,10 @@ namespace egihash
 		data_type data;
 	};
 
-	static dag::impl_t::dag_cache_map dag_cache;
+	static dag_t::impl_t::dag_cache_map dag_cache;
 	static ::std::mutex dag_cache_mutex;
 
-	::std::shared_ptr<dag::impl_t> get_dag(uint64_t block_number, progress_callback_type callback)
+	::std::shared_ptr<dag_t::impl_t> get_dag(uint64_t block_number, progress_callback_type callback)
 	{
 		using namespace std;
 		uint64_t epoch_number = block_number / constants::EPOCH_LENGTH;
@@ -685,7 +685,7 @@ namespace egihash
 
 		// otherwise create the dag and add it to the cache
 		// this is not locked as it can be a lengthy process and we don't want to block access to the dag cache
-		shared_ptr<dag::impl_t> impl(new dag::impl_t(block_number, callback));
+		shared_ptr<dag_t::impl_t> impl(new dag_t::impl_t(block_number, callback));
 
 		lock_guard<mutex> lock(dag_cache_mutex);
 		auto insert_pair = dag_cache.insert(make_pair(epoch_number, impl));
@@ -707,7 +707,7 @@ namespace egihash
 		throw hash_exception("Could not get DAG");
 	}
 
-	::std::shared_ptr<dag::impl_t> get_dag(::std::string const & file_path, progress_callback_type callback)
+	::std::shared_ptr<dag_t::impl_t> get_dag(::std::string const & file_path, progress_callback_type callback)
 	{
 		using namespace std;
 
@@ -768,43 +768,43 @@ namespace egihash
 		throw hash_exception("Could not get DAG");
 	}
 
-	dag::dag(uint64_t block_number, progress_callback_type callback)
+	dag_t::dag_t(uint64_t block_number, progress_callback_type callback)
 	: impl(get_dag(block_number, callback))
 	{
 	}
 
-	dag::dag(::std::string const & file_path, progress_callback_type callback)
+	dag_t::dag_t(::std::string const & file_path, progress_callback_type callback)
 	: impl(get_dag(file_path, callback))
 	{
 
 	}
 
-	uint64_t dag::epoch() const
+	uint64_t dag_t::epoch() const
 	{
 		return impl->epoch;
 	}
 
-	dag::size_type dag::size() const
+	dag_t::size_type dag_t::size() const
 	{
 		return impl->size;
 	}
 
-	dag::data_type const & dag::data() const
+	dag_t::data_type const & dag_t::data() const
 	{
 		return impl->data;
 	}
 
-	void dag::save(::std::string const & file_path, progress_callback_type callback) const
+	void dag_t::save(::std::string const & file_path, progress_callback_type callback) const
 	{
 		impl->save(file_path, callback);
 	}
 
-	cache_t dag::get_cache() const
+	cache_t dag_t::get_cache() const
 	{
 		return impl->get_cache();
 	}
 
-	dag::size_type dag::get_full_size(uint64_t const block_number) noexcept
+	dag_t::size_type dag_t::get_full_size(uint64_t const block_number) noexcept
 	{
 		return impl_t::get_full_size(block_number);
 	}
@@ -867,11 +867,11 @@ namespace egihash
 	// TODO: unit tests / validation
 	result_t hashimoto_light(size_t const full_size, cache_t const & c, sha3_256_t::deserialized_hash_t const & header, uint64_t const nonce)
 	{
-		return hashimoto(header, nonce, full_size, [c](size_t const x){return dag::impl_t::calc_dataset_item(c.data(), x);});
+		return hashimoto(header, nonce, full_size, [c](size_t const x){return dag_t::impl_t::calc_dataset_item(c.data(), x);});
 	}
 
 	// TODO: unit tests / validation
-	result_t hashimoto_full(size_t const full_size, dag const & dataset, sha3_256_t::deserialized_hash_t const & header, uint64_t const nonce)
+	result_t hashimoto_full(size_t const full_size, dag_t const & dataset, sha3_256_t::deserialized_hash_t const & header, uint64_t const nonce)
 	{
 		return hashimoto(header, nonce, full_size, [dataset](size_t const x){return dataset.data()[x];});
 	}
@@ -995,7 +995,7 @@ namespace egihash
 			return true;
 		};
 
-		dag d(0, progress);
+		dag_t d(0, progress);
 		cout << endl << "Saving DAG..." << endl;
 		d.save("epoch0.dag");
 
