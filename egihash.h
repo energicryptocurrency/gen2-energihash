@@ -18,7 +18,9 @@ namespace egihash
 {
 	bool test_function();
 
-	/** \brief hash_exception is the type of all exceptions thrown by egihash.
+	/** \brief hash_exception indicates an error or cancellation when performing a task within egihash.
+	*
+	*	All functions not marked noexcept may be assumed to throw hash_exception or C++ runtime exceptions.
 	*/
 	class hash_exception : public ::std::runtime_error
 	{
