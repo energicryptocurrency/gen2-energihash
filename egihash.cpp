@@ -53,6 +53,83 @@ namespace
 		constexpr EGIHASH_NAMESPACE(result_t) empty_result = {{{0}}, {{0}}};
 	}
 
+#pragma pack(push, 1)
+	struct dag_file_header_t
+	{
+		static constexpr size_t magic_size = sizeof(constants::DAG_MAGIC_BYTES);
+
+		char magic[magic_size];
+		uint32_t major_version;
+		uint32_t minor_version;
+		uint32_t revision;
+		uint64_t epoch;
+		uint64_t cache_begin;
+		uint64_t cache_end;
+		uint64_t dag_begin;
+		uint64_t dag_end;
+		uint8_t unused;
+
+		dag_file_header_t() = delete;
+		dag_file_header_t(dag_file_header_t const &) = default;
+		dag_file_header_t & operator=(dag_file_header_t const &) = default;
+		dag_file_header_t(dag_file_header_t &&) = default;
+		dag_file_header_t & operator=(dag_file_header_t &&) = default;
+		~dag_file_header_t() = default;
+
+		dag_file_header_t(::std::function<bool(void *, size_type)> read)
+		: magic{0}
+		, major_version(0)
+		, minor_version(0)
+		, revision(0)
+		, epoch(0)
+		, cache_begin(0)
+		, cache_end(0)
+		, dag_begin(0)
+		, dag_end(0)
+		, unused(0)
+		{
+			read(magic, magic_size);
+
+			if (std::string(magic) != constants::DAG_MAGIC_BYTES)
+			{
+				throw hash_exception("Not a DAG file");
+			}
+
+			read(&major, sizeof(major));
+			read(&revision, sizeof(revision));
+			read(&minor, sizeof(minor));
+			if ((major != constants::MAJOR_VERSION) || (revision != constants::REVISION))
+			{
+				throw hash_exception("DAG version is invalid");
+			}
+
+			read(&epoch, sizeof(epoch));
+			read(&cache_begin, sizeof(cache_begin));
+			read(&cache_end, sizeof(cache_end));
+			read(&dag_begin, sizeof(dag_begin));
+			read(&dag_end, sizeof(dag_end));
+			read(&unused, sizeof(unused));
+
+			// validate size of cache
+			cache_t::size_type cache_size = cache_t::get_cache_size((epoch * constants::EPOCH_LENGTH) + 1);
+			if ((cache_end <= cache_begin) || (cache_size != (cache_end - cache_begin)) || (cache_end >= static_cast<size_type>(filesize)))
+			{
+				throw hash_exception("DAG cache is corrupt");
+			}
+
+			// validate size of DAG
+			size = get_full_size((epoch * constants::EPOCH_LENGTH) + 1); // get the correct dag size
+			if ((dag_end <= dag_begin) || (size != (dag_end - dag_begin)) || (dag_end > static_cast<size_type>(filesize)))
+			{
+				throw hash_exception("DAG is corrupt");
+			}
+		}
+	};
+#pragma pack(pop)
+
+	static_assert(dag_file_header_t::magic_size == 12, "Magic size invalid.");
+	static_assert(sizeof(dag_file_header_t) == 65, "Dag header size invalid.");
+
 	inline int32_t decode_int(uint8_t const * data, uint8_t const * dataEnd) noexcept
 	{
 		if (!data || (dataEnd < (data + 3)))
@@ -441,13 +518,32 @@ namespace egihash
 			generate(callback);
 		}
 
-		impl_t(::std::string const & file_path, progress_callback_type callback)
-		: epoch(max_epoch)
+		impl_t(::std::function<bool(void *, size_type)> read, dag_file_header_t & header, progress_callback_type callback)
+		: epoch(header.epoch)
 		, size(0)
-		, cache(max_epoch, "") // TODO: fixme
+		, cache(max_epoch, "")
 		, data()
 		{
-			load(file_path, callback);
+			epoch
+			cache.impl->epoch = epoch;
+			cache.impl->size = cache_size;
+
+			// load the cache
+			cache.load(read, callback);
+
+			// load the DAG
+			size_type dag_hash_count = size / constants::HASH_BYTES;
+			data.resize(dag_hash_count);
+			size_t count = 0;
+			for (auto i : data)
+			{
+				i.resize(constants::HASH_BYTES / constants::WORD_BYTES);
+				read(&i[0], constants::HASH_BYTES);
+				if (((++count % constants::CALLBACK_FREQUENCY) == 0) && !callback(count, data.size(), dag_loading))
+				{
+					throw hash_exception("DAG loading cancelled.");
+				}
+			}
 		}
 
 		void save(::std::string const & file_path, progress_callback_type callback) const
@@ -508,92 +604,6 @@ namespace egihash
 			}
 
 			fs.close();
-		}
-
-		void load(::std::string const & file_path, progress_callback_type callback)
-		{
-			using namespace std;
-			ifstream fs;
-			fs.open(file_path, ios::in | ios::binary);
-			uint64_t unused = 0;
-
-			auto read = [&fs](void * dst, size_type count) -> bool
-			{
-				// TODO: read values in as little endian
-				fs.read(reinterpret_cast<char *>(dst), count);
-				return fs.good();
-			};
-
-			fs.seekg(0, ios::end);
-			auto filesize = fs.tellg();
-			fs.seekg(0, ios::beg);
-
-			// check minimum dag size
-			if (filesize < 1090516865) // TODO: make a variable for the header size
-			{
-				throw hash_exception("DAG is corrupt");
-			}
-
-			static constexpr size_t magic_size = sizeof(constants::DAG_MAGIC_BYTES);
-			char magic[magic_size] = {0};
-			read(magic, magic_size - 1);
-			read(&unused, 1);
-
-			if (std::string(magic) != constants::DAG_MAGIC_BYTES)
-			{
-				throw hash_exception("Not a DAG file");
-			}
-
-			uint32_t major = 0, revision = 0, minor = 0;
-			read(&major, sizeof(major));
-			read(&revision, sizeof(revision));
-			read(&minor, sizeof(minor));
-			if ((major != constants::MAJOR_VERSION) || (revision != constants::REVISION))
-			{
-				throw hash_exception("DAG version is invalid");
-			}
-
-			uint64_t cache_begin = 0, cache_end = 0, dag_begin = 0, dag_end = 0;
-			read(&epoch, sizeof(epoch));
-			read(&cache_begin, sizeof(cache_begin));
-			read(&cache_end, sizeof(cache_end));
-			read(&dag_begin, sizeof(dag_begin));
-			read(&dag_end, sizeof(dag_end));
-			read(&unused, 1);
-
-			// validate size of cache
-			cache_t::size_type cache_size = cache_t::get_cache_size((epoch * constants::EPOCH_LENGTH) + 1);
-			if ((cache_end <= cache_begin) || (cache_size != (cache_end - cache_begin)) || (cache_end >= static_cast<size_type>(filesize)))
-			{
-				throw hash_exception("DAG cache is corrupt");
-			}
-
-			// validate size of DAG
-			size = get_full_size((epoch * constants::EPOCH_LENGTH) + 1); // get the correct dag size
-			if ((dag_end <= dag_begin) || (size != (dag_end - dag_begin)) || (dag_end > static_cast<size_type>(filesize)))
-			{
-				throw hash_exception("DAG is corrupt");
-			}
-
-			cache.impl->epoch = epoch;
-			cache.impl->size = cache_size;
-
-			// load the cache
-			cache.load(read, callback);
-
-			// load the DAG
-			size_type dag_hash_count = size / constants::HASH_BYTES;
-			data.resize(dag_hash_count);
-			size_t count = 0;
-			for (auto i : data)
-			{
-				i.resize(constants::HASH_BYTES / constants::WORD_BYTES);
-				read(&i[0], constants::HASH_BYTES);
-				if (((++count % constants::CALLBACK_FREQUENCY) == 0) && !callback(count, data.size(), dag_loading))
-				{
-					throw hash_exception("DAG loading cancelled.");
-				}
-			}
 		}
 
 		void generate(progress_callback_type callback)
@@ -700,13 +710,62 @@ namespace egihash
 	::std::shared_ptr<dag::impl_t> get_dag(::std::string const & file_path, progress_callback_type callback)
 	{
 		using namespace std;
-		shared_ptr<dag::impl_t> impl;
 
-		// TODO: implement me
-		(void)file_path;
-		(void)callback;
+		ifstream fs;
+		fs.open(file_path, ios::in | ios::binary);
+		dag_header_t header = {0};
 
-		return impl;
+		auto read = [&fs](void * dst, size_type count) -> bool
+		{
+			// TODO: read values in as little endian
+			fs.read(reinterpret_cast<char *>(dst), count);
+			return fs.good();
+		};
+
+		fs.seekg(0, ios::end);
+		auto filesize = fs.tellg();
+		fs.seekg(0, ios::beg);
+
+		// check minimum dag size
+		if (filesize < 1090516865) // TODO: make a variable for the header size
+		{
+			throw hash_exception("DAG is corrupt");
+		}
+
+		dag_header_t header(fs);
+
+		// if we have the correct DAG already loaded, return it from the cache
+		{
+			lock_guard<mutex> lock(dag_cache_mutex);
+			auto const dag_cache_iterator = dag_cache.find(header.epoch);
+			if (dag_cache_iterator != dag_cache.end())
+			{
+				return dag_cache_iterator->second;
+			}
+		}
+
+		// otherwise create the dag and add it to the cache
+		// this is not locked as it can be a lengthy process and we don't want to block access to the dag cache
+		shared_ptr<dag::impl_t> impl(new dag::impl_t(read, header, callback));
+
+		lock_guard<mutex> lock(dag_cache_mutex);
+		auto insert_pair = dag_cache.insert(make_pair(header.epoch, impl));
+
+		// if insert succeded, return the dag
+		if (insert_pair.second)
+		{
+			return insert_pair.first->second;
+		}
+
+		// if insert failed, it's probably already been inserted
+		auto const dag_cache_iterator = dag_cache.find(header.epoch);
+		if (dag_cache_iterator != dag_cache.end())
+		{
+			return dag_cache_iterator->second;
+		}
+
+		// we couldn't insert it and it's not in the cache
+		throw hash_exception("Could not get DAG");
 	}
 
 	dag::dag(uint64_t block_number, progress_callback_type callback)
