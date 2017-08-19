@@ -10,12 +10,29 @@
 
 #include <functional>
 #include <memory>
+#include <stdexcept>
 #include <type_traits>
 #include <vector>
 
 namespace egihash
 {
 	bool test_function();
+
+	class hash_exception : public ::std::runtime_error
+	{
+	public:
+		hash_exception(std::string const & what_arg) noexcept
+		: runtime_error(what_arg)
+		{
+
+		}
+
+		hash_exception(char const * what_arg) noexcept
+		: runtime_error(what_arg)
+		{
+
+		}
+	};
 
 	/** \brief epoch0_seedhash is is the seed hash for the genesis block and first epoch of the DAG.
 	*			All seed hashes for subsequent epochs will be generated from this seedhash.

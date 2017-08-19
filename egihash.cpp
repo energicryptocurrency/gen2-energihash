@@ -187,22 +187,6 @@ namespace
 		return ((v1 * FNV_PRIME) ^ v2) % FNV_MODULUS;
 	}
 
-	class hash_exception : public ::std::runtime_error
-	{
-	public:
-		hash_exception(std::string const & what_arg) noexcept
-		: runtime_error(what_arg)
-		{
-
-		}
-
-		hash_exception(char const * what_arg) noexcept
-		: runtime_error(what_arg)
-		{
-
-		}
-	};
-
 	template <size_t HashSize, int (*HashFunction)(uint8_t *, size_t, uint8_t const * in, size_t)>
 	struct sha3_base
 	{
