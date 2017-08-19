@@ -18,15 +18,21 @@ namespace egihash
 {
 	bool test_function();
 
+	/** \brief hash_exception is the type of all exceptions thrown by egihash.
+	*/
 	class hash_exception : public ::std::runtime_error
 	{
 	public:
+		/** \brief construct a hash_exception from a std::string const &
+		*/
 		hash_exception(std::string const & what_arg) noexcept
 		: runtime_error(what_arg)
 		{
 
 		}
 
+		/** \brief construct a hash_exception from a char const *
+		*/
 		hash_exception(char const * what_arg) noexcept
 		: runtime_error(what_arg)
 		{
