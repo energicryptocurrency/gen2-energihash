@@ -16,7 +16,7 @@
 
 namespace egihash
 {
-	bool test_function();
+	bool test_function() noexcept;
 
 	namespace constants
 	{

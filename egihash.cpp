@@ -886,7 +886,7 @@ namespace egihash
 		return hashimoto(header, nonce, full_size, [dataset](size_t const x){return dataset.data()[x];});
 	}
 
-	bool test_function()
+	bool test_function_()
 	{
 		using namespace std;
 
@@ -1012,6 +1012,28 @@ namespace egihash
 		cout << endl;
 
 		return success;
+	}
+
+	bool test_function() noexcept
+	{
+		using namespace std;
+		bool result = false;
+		try
+		{
+			result = test_function_();
+		}
+		catch (::std::exception const & e)
+		{
+			cerr << "[ERROR]: Caught exception: " << e.what() << endl;
+			result = false;
+		}
+		catch(...)
+		{
+			cerr << "[ERROR]: Unknown exception." << endl;
+			result = false;
+		}
+
+		return result;
 	}
 }
 
