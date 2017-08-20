@@ -690,9 +690,9 @@ namespace egihash
 			throw hash_exception("DAG is corrupt");
 		}
 
-		// data for 64k reads
-		// 64k was chosen as it is divisible by the constants::CACHE_BYTES_GROWTH and the constants::DATASET_BYTES_GROWTH
-		vector<char> read_buffer(64 * 1024, 0);
+		// data for 64MiB reads
+		// 64MiB was chosen as it is divisible by the constants::CACHE_BYTES_GROWTH and the constants::DATASET_BYTES_GROWTH
+		vector<char> read_buffer(64 * 1024 * 1024, 0);
 		auto buffer_ptr = &read_buffer[0];
 		auto buffer_ptr_end = &read_buffer.back();
 		// prime the buffer
