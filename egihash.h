@@ -28,6 +28,10 @@ namespace egihash
 		*/
 		static constexpr uint32_t DAG_FILE_HEADER_SIZE = sizeof(DAG_MAGIC_BYTES) + (5 * sizeof(uint64_t)) + (3 * sizeof(uint32_t)) + 2;
 
+		/** \brief DAG_FILE_MINIMUM_SIZE is the size of the DAG file at epoch 0.
+		*/
+		static constexpr uint64_t DAG_FILE_MINIMUM_SIZE = 1090516865;
+
 		/** \brief CALLBACK_FREQUENCY determines how often callbacks will be called.
 		*
 		*	1 means every iteration, 10 means every 10th iteration, and so on...

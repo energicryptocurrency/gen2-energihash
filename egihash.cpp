@@ -698,7 +698,7 @@ namespace egihash
 		fs.seekg(0, ios::beg);
 
 		// check minimum dag size
-		if (filesize < 1090516865) // TODO: make a variable for the header size
+		if (filesize < constants::DAG_FILE_MINIMUM_SIZE)
 		{
 			throw hash_exception("DAG is corrupt");
 		}
