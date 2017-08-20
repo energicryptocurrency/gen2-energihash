@@ -973,7 +973,9 @@ namespace egihash
 
 		dag_t d("epoch0_verified.dag", progress);
 		//cout << endl << "Saving DAG..." << endl;
+		cout << endl;
 		d.save("epoch0.dag", progress);
+		cout << endl;
 
 		return success;
 	}
