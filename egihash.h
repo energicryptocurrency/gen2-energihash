@@ -36,7 +36,7 @@ namespace egihash
 		*
 		*	1 means every iteration, 10 means every 10th iteration, and so on...
 		*/
-		static constexpr uint32_t CALLBACK_FREQUENCY = 1u;
+		static constexpr uint32_t CALLBACK_FREQUENCY = 1024u;
 
 		/** \brief The major version of egihash
 		*/
