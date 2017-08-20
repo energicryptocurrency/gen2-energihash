@@ -521,11 +521,14 @@ namespace egihash
 			uint64_t dag_begin = cache_end;
 			uint64_t dag_end = dag_begin + size;
 
-			auto write = [&fs](void const * data, size_type count) -> bool
+			auto write = [&fs](void const * data, size_type count)
 			{
 				// TODO: write all value in little endian
 				fs.write(reinterpret_cast<char const *>(data), count);
-				return fs.good();
+				if (fs.fail())
+				{
+					throw hash_exception("Write failure");
+				}
 			};
 
 			fs << constants::DAG_MAGIC_BYTES;
