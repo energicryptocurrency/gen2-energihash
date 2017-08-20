@@ -562,8 +562,6 @@ namespace egihash
 					throw hash_exception("DAG save cancelled.");
 				}
 			}
-
-			fs.close();
 		}
 
 		void generate(progress_callback_type callback)
