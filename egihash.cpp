@@ -683,25 +683,59 @@ namespace egihash
 			throw hash_exception("Could not open DAG file.");
 		}
 
-		auto read = [&fs](void * dst, size_type count)
-		{
-			// TODO: read values in as little endian
-			fs.read(reinterpret_cast<char *>(dst), count);
-			if (!fs.good())
-			{
-				throw hash_exception("Read failure");
-			}
-		};
-
 		fs.seekg(0, ios::end);
-		auto filesize = fs.tellg();
+		auto const filesize = fs.tellg();
 		fs.seekg(0, ios::beg);
 
 		// check minimum dag size
-		if (filesize < constants::DAG_FILE_MINIMUM_SIZE)
+		if (filesize < static_cast<int64_t>(constants::DAG_FILE_MINIMUM_SIZE))
 		{
 			throw hash_exception("DAG is corrupt");
 		}
+
+		vector<char> read_buffer(64 * 1024, 0); // 64k buffered reads
+		auto buffer_ptr = &read_buffer[0];
+		auto buffer_ptr_end = &read_buffer.back();
+		// prime the buffer
+		fs.read(buffer_ptr, read_buffer.size());
+		if (!fs.good())
+		{
+			throw hash_exception("Read failure");
+		}
+
+		// TODO: this func needs to be made endian safe
+		auto read = [&fs, &read_buffer, &buffer_ptr, &buffer_ptr_end, &filesize](void * dst, size_type count)
+		{
+			// full buffer consumed exactly
+			if ((buffer_ptr_end - buffer_ptr) == 0)
+			{
+				fs.read(&read_buffer[0], read_buffer.size());
+				if (!fs.good())
+				{
+					throw hash_exception("Read failure");
+				}
+				buffer_ptr = &read_buffer[0];
+			}
+
+			// need to consume part of the buffer and then read more
+			if (count > static_cast<size_type>(buffer_ptr_end - buffer_ptr))
+			{
+				::std::memcpy(dst, buffer_ptr, buffer_ptr_end - buffer_ptr);
+				count -= (buffer_ptr_end - buffer_ptr);
+				dst = reinterpret_cast<char*>(dst) + (buffer_ptr_end - buffer_ptr);
+
+				fs.read(&read_buffer[0], read_buffer.size());
+				if (!fs.good())
+				{
+					throw hash_exception("Read failure");
+				}
+				buffer_ptr = &read_buffer[0];
+			}
+
+			// copy from the buffer
+			::std::memcpy(dst, buffer_ptr, count);
+			buffer_ptr += count;
+		};
 
 		dag_file_header_t header(read);
 
