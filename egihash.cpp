@@ -40,7 +40,6 @@ namespace
 		uint64_t cache_end;
 		uint64_t dag_begin;
 		uint64_t dag_end;
-		uint8_t unused;
 
 		dag_file_header_t() = delete;
 		dag_file_header_t(dag_file_header_t const &) = default;
@@ -59,7 +58,6 @@ namespace
 		, cache_end(0)
 		, dag_begin(0)
 		, dag_end(0)
-		, unused(0)
 		{
 			read(magic, magic_size);
 
@@ -81,7 +79,6 @@ namespace
 			read(&cache_end, sizeof(cache_end));
 			read(&dag_begin, sizeof(dag_begin));
 			read(&dag_end, sizeof(dag_end));
-			read(&unused, sizeof(unused));
 
 			// validate size of cache
 			cache_t::size_type cache_size = cache_t::get_cache_size((epoch * constants::EPOCH_LENGTH) + 1);
@@ -101,7 +98,7 @@ namespace
 #pragma pack(pop)
 
 	static_assert(dag_file_header_t::magic_size == 12, "Magic size invalid.");
-	static_assert(sizeof(dag_file_header_t) == 65, "Dag header size invalid.");
+	static_assert(sizeof(dag_file_header_t) == 64, "Dag header size invalid.");
 
 	inline int32_t decode_int(uint8_t const * data, uint8_t const * dataEnd) noexcept
 	{
@@ -515,7 +512,6 @@ namespace egihash
 			ofstream fs;
 			fs.open(file_path, ios::out | ios::binary);
 
-			static constexpr uint64_t zero = 0;
 			uint64_t cache_begin = constants::DAG_FILE_HEADER_SIZE;
 			uint64_t cache_end = cache_begin + cache.size();
 			uint64_t dag_begin = cache_end;
@@ -531,8 +527,7 @@ namespace egihash
 				}
 			};
 
-			fs << constants::DAG_MAGIC_BYTES;
-			write(&zero, 1);
+			write(constants::DAG_MAGIC_BYTES, sizeof(constants::DAG_MAGIC_BYTES));
 			write(&constants::MAJOR_VERSION, sizeof(constants::MAJOR_VERSION));
 			write(&constants::REVISION, sizeof(constants::REVISION));
 			write(&constants::MINOR_VERSION, sizeof(constants::MINOR_VERSION));
@@ -541,7 +536,6 @@ namespace egihash
 			write(&cache_end, sizeof(cache_end));
 			write(&dag_begin, sizeof(dag_begin));
 			write(&dag_end, sizeof(dag_end));
-			write(&zero, 1);
 
 			size_t max_count = cache.size() + data.size();
 			size_t count = 0;
