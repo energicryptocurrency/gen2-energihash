@@ -693,12 +693,14 @@ namespace egihash
 			throw hash_exception("DAG is corrupt");
 		}
 
-		vector<char> read_buffer(64 * 1024, 0); // 64k buffered reads
+		// data for 64k reads
+		// 64k was chosen as it is divisible by the constants::CACHE_BYTES_GROWTH and the constants::DATASET_BYTES_GROWTH
+		vector<char> read_buffer(64 * 1024, 0);
 		auto buffer_ptr = &read_buffer[0];
 		auto buffer_ptr_end = &read_buffer.back();
 		// prime the buffer
 		fs.read(buffer_ptr, read_buffer.size());
-		if (fs.fail())
+		if (fs.fail() && !fs.eof())
 		{
 			throw hash_exception("Read failure");
 		}
@@ -710,7 +712,7 @@ namespace egihash
 			if ((buffer_ptr_end - buffer_ptr) == 0)
 			{
 				fs.read(&read_buffer[0], read_buffer.size());
-				if (fs.fail())
+				if (fs.fail() && !fs.eof())
 				{
 					throw hash_exception("Read failure");
 				}
@@ -725,7 +727,7 @@ namespace egihash
 				dst = reinterpret_cast<char*>(dst) + (buffer_ptr_end - buffer_ptr);
 
 				fs.read(&read_buffer[0], read_buffer.size());
-				if (fs.fail())
+				if (fs.fail() && !fs.eof())
 				{
 					throw hash_exception("Read failure");
 				}
