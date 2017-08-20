@@ -47,7 +47,7 @@ namespace
 		dag_file_header_t & operator=(dag_file_header_t &&) = default;
 		~dag_file_header_t() = default;
 
-		dag_file_header_t(::std::function<bool(void *, size_type)> read)
+		dag_file_header_t(read_function_type read)
 		: magic{0}
 		, major_version(0)
 		, revision(0)
@@ -357,7 +357,7 @@ namespace egihash
 			mkcache(seed, callback);
 		}
 
-		impl_t(uint64_t epoch, uint64_t size, ::std::function<bool(void *, size_type)> read, progress_callback_type callback)
+		impl_t(uint64_t epoch, uint64_t size, read_function_type read, progress_callback_type callback)
 		: epoch(epoch)
 		, size(size)
 		, data()
@@ -401,7 +401,7 @@ namespace egihash
 			}
 		}
 
-		void load(::std::function<bool(void *, size_type)> read, progress_callback_type callback)
+		void load(read_function_type read, progress_callback_type callback)
 		{
 			size_type const cache_hash_count = size / constants::HASH_BYTES;
 
@@ -440,7 +440,7 @@ namespace egihash
 	{
 	}
 
-	cache_t::cache_t(uint64_t epoch, uint64_t size, ::std::function<bool(void *, size_type)> read, progress_callback_type callback)
+	cache_t::cache_t(uint64_t epoch, uint64_t size, read_function_type read, progress_callback_type callback)
 	: impl(new impl_t(epoch, size, read, callback))
 	{
 	}
@@ -460,7 +460,7 @@ namespace egihash
 		return impl->data;
 	}
 
-	void cache_t::load(::std::function<bool(void *, size_type)> read, progress_callback_type callback)
+	void cache_t::load(read_function_type read, progress_callback_type callback)
 	{
 		impl->load(read, callback);
 	}
@@ -486,7 +486,7 @@ namespace egihash
 			generate(callback);
 		}
 
-		impl_t(::std::function<bool(void *, size_type)> read, dag_file_header_t & header, progress_callback_type callback)
+		impl_t(read_function_type read, dag_file_header_t & header, progress_callback_type callback)
 		: epoch(header.epoch)
 		, size(header.dag_end - header.dag_begin)
 		, cache(header.epoch, header.cache_end - header.cache_begin, read, callback)

@@ -183,6 +183,15 @@ namespace egihash
 	*/
 	using progress_callback_type = ::std::function<bool (::std::size_t step, ::std::size_t max, progress_callback_phase phase)>;
 
+	/** \brief read_function_type is a function which passed to various objects which perform loading of a file, such as the cache and DAG.
+	*
+	*	Note that this function will own whatever data it needs to perform the read, i.e. the filestream.
+	*	\param dst points to the memory location that should be read into.
+	*	\param count represents the number of bytes to read.
+	*	\return true if the read was successful, false otherwise.
+	*/
+	using read_function_type = ::std::function<bool(void * dst, ::std::size_t count)>;
+
 	/** \brief cache_t is the cache used to compute a DAG for a given epoch.
 	*
 	* Each DAG owns a cache_t and the size of the cache grows linearly in time.
@@ -264,14 +273,14 @@ namespace egihash
 		*	\param read A function which will read cache data from disk.
 		*	\param callback (optional) may be used to monitor the progress of cache loading. Return false to cancel, true to continue.
 		*/
-		cache_t(uint64_t epoch, uint64_t size, ::std::function<bool(void *, size_type)> read, progress_callback_type callback = [](size_type, size_type, int){ return true; });
+		cache_t(uint64_t epoch, uint64_t size, read_function_type read, progress_callback_type callback = [](size_type, size_type, int){ return true; });
 
 		/** \brief Load a cache from disk.
 		*
 		*	\param read A function which will read cache data from disk.
 		*	\param callback (optional) may be used to monitor the progress of cache loading. Return false to cancel, true to continue.
 		*/
-		void load(::std::function<bool(void *, size_type)> read, progress_callback_type callback = [](size_type, size_type, int){ return true; });
+		void load(read_function_type read, progress_callback_type callback = [](size_type, size_type, int){ return true; });
 
 		/** \brief cache_t private implementation.
 		*/
