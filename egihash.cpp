@@ -411,7 +411,7 @@ namespace egihash
 			size_t count = 0;
 			for (auto & i : data)
 			{
-				i.resize(constants::HASH_BYTES / constants::WORD_SIZE);
+				i.resize(constants::HASH_BYTES / constants::WORD_BYTES);
 				read(&i[0], constants::HASH_BYTES);
 				if (((++count % constants::CALLBACK_FREQUENCY) == 0) && !callback(count, cache_hash_count, cache_loading))
 				{
