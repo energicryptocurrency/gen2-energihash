@@ -23,31 +23,6 @@ extern "C"
 
 namespace
 {
-	namespace constants
-	{
-		constexpr char DAG_MAGIC_BYTES[] = "EGIHASH_DAG";
-		constexpr uint32_t DAG_FILE_HEADER_SIZE = sizeof(DAG_MAGIC_BYTES) + (5 * sizeof(uint64_t)) + (3 * sizeof(uint32_t)) + 2;
-		constexpr uint32_t CALLBACK_FREQUENCY = 1u;
-		constexpr uint32_t MAJOR_VERSION = 1u;
-		constexpr uint32_t REVISION = 23u;
-		constexpr uint32_t MINOR_VERSION = 0u;
-		constexpr uint32_t WORD_BYTES = 4u;                       // bytes in word
-		constexpr uint32_t DATASET_BYTES_INIT = 1u << 30u;        // bytes in dataset at genesis
-		constexpr uint32_t DATASET_BYTES_GROWTH = 1u << 23u;      // dataset growth per epoch
-		constexpr uint32_t CACHE_BYTES_INIT = 1u << 24u;          // bytes in cache at genesis
-		constexpr uint32_t CACHE_BYTES_GROWTH = 1u << 17u;        // cache growth per epoch
-		constexpr uint32_t CACHE_MULTIPLIER=1024u;                // Size of the DAG relative to the cache
-		constexpr uint32_t EPOCH_LENGTH = 30000u;                 // blocks per epoch
-		constexpr uint32_t MIX_BYTES = 128u;                      // width of mix
-		constexpr uint32_t HASH_BYTES = 64u;                      // hash length in bytes
-		constexpr uint32_t DATASET_PARENTS = 256u;                // number of parents of each dataset element
-		constexpr uint32_t CACHE_ROUNDS = 3u;                     // number of rounds in cache production
-		constexpr uint32_t ACCESSES = 64u;                        // number of accesses in hashimoto loop
-
-		constexpr EGIHASH_NAMESPACE(h256_t) empty_h256 = {{0}};
-		constexpr EGIHASH_NAMESPACE(result_t) empty_result = {{{0}}, {{0}}};
-	}
-
 #pragma pack(push, 1)
 	struct dag_file_header_t
 	{

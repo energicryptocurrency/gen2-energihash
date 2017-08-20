@@ -18,6 +18,89 @@ namespace egihash
 {
 	bool test_function();
 
+	namespace constants
+	{
+		/** \brief DAG_MAGIC_BYTES is the starting sequence of a DAG file, used for identification.
+		*/
+		static constexpr char DAG_MAGIC_BYTES[] = "EGIHASH_DAG";
+
+		/** \brief DAG_FILE_HEADER_SIZE is the expected size of a DAG file header.
+		*/
+		static constexpr uint32_t DAG_FILE_HEADER_SIZE = sizeof(DAG_MAGIC_BYTES) + (5 * sizeof(uint64_t)) + (3 * sizeof(uint32_t)) + 2;
+
+		/** \brief CALLBACK_FREQUENCY determines how often callbacks will be called.
+		*
+		*	1 means every iteration, 10 means every 10th iteration, and so on...
+		*/
+		static constexpr uint32_t CALLBACK_FREQUENCY = 1u;
+
+		/** \brief The major version of egihash
+		*/
+		static constexpr uint32_t MAJOR_VERSION = 1u;
+
+		/** \brief The revision number (middle version digit) of egihash
+		*/
+		static constexpr uint32_t REVISION = 23u;
+
+		/** \brief The minor version number of egihash
+		*/
+		static constexpr uint32_t MINOR_VERSION = 0u;
+
+		/** \brief Number of bytes in a hash word.
+		*/
+		static constexpr uint32_t WORD_BYTES = 4u;
+
+		/** \brief The number of bytes in the dataset at genesis.
+		*/
+		static constexpr uint32_t DATASET_BYTES_INIT = 1u << 30u;
+
+		/** \brief The growth of the dataset in bytes per epoch.
+		*/
+		static constexpr uint32_t DATASET_BYTES_GROWTH = 1u << 23u;
+
+		/** \brief The number of bytes in the cache at genesis.
+		*/
+		static constexpr uint32_t CACHE_BYTES_INIT = 1u << 24u;
+
+		/** \brief The growth of the cache in bytes per epoch.
+		*/
+		static constexpr uint32_t CACHE_BYTES_GROWTH = 1u << 17u;
+
+		/** \brief Ratio of the size of the DAG in bytes relative to the size of the cache in bytes..
+		*/
+		static constexpr uint32_t CACHE_MULTIPLIER=1024u;
+
+		/** \brief The number of blocks which constitute one epoch.
+		*
+		*	The DAG and cache must be regenerated once per epoch.
+		*/
+		static constexpr uint32_t EPOCH_LENGTH = 30000u;
+
+		/** \brief The width of the mix hash for egihash.
+		*/
+		static constexpr uint32_t MIX_BYTES = 128u;
+
+		/** \brief The size of an egihash in bytes.
+		*/
+		static constexpr uint32_t HASH_BYTES = 64u;
+
+		/** \brief The number of parents for each element in the DAG.
+		*/
+		static constexpr uint32_t DATASET_PARENTS = 256u;
+
+		/** \brief The number of hashing rounds used to produce the cache.
+		*/
+		static constexpr uint32_t CACHE_ROUNDS = 3u;
+
+		/** \brief The number of DAG lookups to compute an egihash.
+		*/
+		static constexpr uint32_t ACCESSES = 64u;
+
+		// TODO: C API
+		//static constexpr EGIHASH_NAMESPACE(h256_t) empty_h256 = {{0}};
+		//static constexpr EGIHASH_NAMESPACE(result_t) empty_result = {{{0}}, {{0}}};
+	}
+
 	/** \brief hash_exception indicates an error or cancellation when performing a task within egihash.
 	*
 	*	All functions not marked noexcept may be assumed to throw hash_exception or C++ runtime exceptions.
