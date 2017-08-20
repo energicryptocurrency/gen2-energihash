@@ -56,8 +56,8 @@ namespace
 
 		char magic[magic_size];
 		uint32_t major_version;
-		uint32_t minor_version;
 		uint32_t revision;
+		uint32_t minor_version;
 		uint64_t epoch;
 		uint64_t cache_begin;
 		uint64_t cache_end;
@@ -75,8 +75,8 @@ namespace
 		dag_file_header_t(::std::function<bool(void *, size_type)> read)
 		: magic{0}
 		, major_version(0)
-		, minor_version(0)
 		, revision(0)
+		, minor_version(0)
 		, epoch(0)
 		, cache_begin(0)
 		, cache_end(0)
@@ -91,10 +91,10 @@ namespace
 				throw ::egihash::hash_exception("Not a DAG file");
 			}
 
-			read(&major, sizeof(major));
+			read(&major_version, sizeof(major_version));
 			read(&revision, sizeof(revision));
-			read(&minor, sizeof(minor));
-			if ((major != constants::MAJOR_VERSION) || (revision != constants::REVISION))
+			read(&minor_version, sizeof(minor_version));
+			if ((major_version != constants::MAJOR_VERSION) || (revision != constants::REVISION))
 			{
 				throw ::egihash::hash_exception("DAG version is invalid");
 			}
@@ -107,15 +107,15 @@ namespace
 			read(&unused, sizeof(unused));
 
 			// validate size of cache
-			cache_t::size_type cache_size = cache_t::get_cache_size((epoch * constants::EPOCH_LENGTH) + 1);
-			if ((cache_end <= cache_begin) || (cache_size != (cache_end - cache_begin)) || (cache_end >= static_cast<size_type>(filesize)))
+			::egihash::cache_t::size_type cache_size = ::egihash::cache_t::get_cache_size((epoch * constants::EPOCH_LENGTH) + 1);
+			if ((cache_end <= cache_begin) || (cache_size != (cache_end - cache_begin)))
 			{
 				throw ::egihash::hash_exception("DAG cache is corrupt");
 			}
 
 			// validate size of DAG
-			size = get_full_size((epoch * constants::EPOCH_LENGTH) + 1); // get the correct dag size
-			if ((dag_end <= dag_begin) || (size != (dag_end - dag_begin)) || (dag_end > static_cast<size_type>(filesize)))
+			uint64_t const size = ::egihash::dag_t::get_full_size((epoch * constants::EPOCH_LENGTH) + 1); // get the correct dag size
+			if ((dag_end <= dag_begin) || (size != (dag_end - dag_begin)))
 			{
 				throw ::egihash::hash_exception("DAG is corrupt");
 			}
@@ -504,9 +504,10 @@ namespace egihash
 		, cache(max_epoch, "")
 		, data()
 		{
-			epoch
-			cache.impl->epoch = epoch;
-			cache.impl->size = cache_size;
+			epoch = header.epoch;
+			size = header.dag_end - header.dag_begin;
+			cache.impl->epoch = header.epoch;
+			cache.impl->size = header.cache_end - header.cache_begin;
 
 			// load the cache
 			cache.load(read, callback);
@@ -690,10 +691,10 @@ namespace egihash
 	::std::shared_ptr<dag_t::impl_t> get_dag(::std::string const & file_path, progress_callback_type callback)
 	{
 		using namespace std;
+		using size_type = dag_t::size_type;
 
 		ifstream fs;
 		fs.open(file_path, ios::in | ios::binary);
-		dag_header_t header = {0};
 
 		auto read = [&fs](void * dst, size_type count) -> bool
 		{
@@ -712,7 +713,12 @@ namespace egihash
 			throw hash_exception("DAG is corrupt");
 		}
 
-		dag_header_t header(fs);
+		dag_file_header_t header(read);
+
+		if ((header.cache_end >= static_cast<size_type>(filesize)) || (header.dag_end > static_cast<size_type>(filesize)))
+		{
+			throw hash_exception("DAG is corrupt");
+		}
 
 		// if we have the correct DAG already loaded, return it from the cache
 		{
