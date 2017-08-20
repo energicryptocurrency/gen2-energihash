@@ -545,9 +545,9 @@ namespace egihash
 
 			size_t max_count = cache.size() + data.size();
 			size_t count = 0;
-			for (auto const i : cache.data())
+			for (auto const & i : cache.data())
 			{
-				for (auto const j : i)
+				for (auto const & j : i)
 				{
 					write(&j, sizeof(j));
 				}
@@ -557,9 +557,9 @@ namespace egihash
 				}
 			}
 
-			for (auto const i : data)
+			for (auto const & i : data)
 			{
-				for (auto const j : i)
+				for (auto const & j : i)
 				{
 					write(&j, sizeof(j));
 				}
