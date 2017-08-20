@@ -696,6 +696,11 @@ namespace egihash
 		ifstream fs;
 		fs.open(file_path, ios::in | ios::binary);
 
+		if (!fs.good())
+		{
+			throw hash_exception("Could not open DAG file.");
+		}
+
 		auto read = [&fs](void * dst, size_type count) -> bool
 		{
 			// TODO: read values in as little endian
@@ -981,9 +986,9 @@ namespace egihash
 			return true;
 		};
 
-		dag_t d(0, progress);
-		cout << endl << "Saving DAG..." << endl;
-		d.save("epoch0.dag");
+		dag_t d("epoch0_verified.dag", progress);
+		//cout << endl << "Saving DAG..." << endl;
+		d.save("epoch0.dag", progress);
 
 		return success;
 	}
