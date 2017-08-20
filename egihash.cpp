@@ -495,7 +495,6 @@ namespace egihash
 		, data()
 		{
 			// load the DAG
-			std::cout << "size is " << size << std::endl;
 			size_type dag_hash_count = size / constants::HASH_BYTES;
 			data.resize(dag_hash_count);
 			size_t count = 0;
