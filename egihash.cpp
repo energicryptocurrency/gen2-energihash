@@ -23,11 +23,13 @@ extern "C"
 
 namespace
 {
+	using namespace egihash;
+
 #pragma pack(push, 1)
 	struct dag_file_header_t
 	{
 		static constexpr size_t magic_size = sizeof(constants::DAG_MAGIC_BYTES);
-		using size_type = ::egihash::dag_t::size_type;
+		using size_type = dag_t::size_type;
 
 		char magic[magic_size];
 		uint32_t major_version;
@@ -63,7 +65,7 @@ namespace
 
 			if (std::string(magic) != constants::DAG_MAGIC_BYTES)
 			{
-				throw ::egihash::hash_exception("Not a DAG file");
+				throw hash_exception("Not a DAG file");
 			}
 
 			read(&major_version, sizeof(major_version));
@@ -71,7 +73,7 @@ namespace
 			read(&minor_version, sizeof(minor_version));
 			if ((major_version != constants::MAJOR_VERSION) || (revision != constants::REVISION))
 			{
-				throw ::egihash::hash_exception("DAG version is invalid");
+				throw hash_exception("DAG version is invalid");
 			}
 
 			read(&epoch, sizeof(epoch));
@@ -82,17 +84,17 @@ namespace
 			read(&unused, sizeof(unused));
 
 			// validate size of cache
-			::egihash::cache_t::size_type cache_size = ::egihash::cache_t::get_cache_size((epoch * constants::EPOCH_LENGTH) + 1);
+			cache_t::size_type cache_size = cache_t::get_cache_size((epoch * constants::EPOCH_LENGTH) + 1);
 			if ((cache_end <= cache_begin) || (cache_size != (cache_end - cache_begin)))
 			{
-				throw ::egihash::hash_exception("DAG cache is corrupt");
+				throw hash_exception("DAG cache is corrupt");
 			}
 
 			// validate size of DAG
-			uint64_t const size = ::egihash::dag_t::get_full_size((epoch * constants::EPOCH_LENGTH) + 1); // get the correct dag size
+			uint64_t const size = dag_t::get_full_size((epoch * constants::EPOCH_LENGTH) + 1); // get the correct dag size
 			if ((dag_end <= dag_begin) || (size != (dag_end - dag_begin)))
 			{
-				throw ::egihash::hash_exception("DAG is corrupt");
+				throw hash_exception("DAG is corrupt");
 			}
 		}
 	};
@@ -199,7 +201,7 @@ namespace
 		{
 			if (HashFunction(data, hash_size, reinterpret_cast<uint8_t const *>(input), input_size) != 0)
 			{
-				throw ::egihash::hash_exception("Unable to compute hash"); // TODO: better message?
+				throw hash_exception("Unable to compute hash"); // TODO: better message?
 			}
 		}
 
