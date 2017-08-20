@@ -679,7 +679,7 @@ namespace egihash
 		ifstream fs;
 		fs.open(file_path, ios::in | ios::binary);
 
-		if (!fs.good())
+		if (fs.fail())
 		{
 			throw hash_exception("Could not open DAG file.");
 		}
@@ -699,7 +699,7 @@ namespace egihash
 		auto buffer_ptr_end = &read_buffer.back();
 		// prime the buffer
 		fs.read(buffer_ptr, read_buffer.size());
-		if (!fs.good())
+		if (fs.fail())
 		{
 			throw hash_exception("Read failure");
 		}
@@ -711,7 +711,7 @@ namespace egihash
 			if ((buffer_ptr_end - buffer_ptr) == 0)
 			{
 				fs.read(&read_buffer[0], read_buffer.size());
-				if (!fs.good())
+				if (fs.fail())
 				{
 					throw hash_exception("Read failure");
 				}
@@ -726,7 +726,7 @@ namespace egihash
 				dst = reinterpret_cast<char*>(dst) + (buffer_ptr_end - buffer_ptr);
 
 				fs.read(&read_buffer[0], read_buffer.size());
-				if (!fs.good())
+				if (fs.fail())
 				{
 					throw hash_exception("Read failure");
 				}
