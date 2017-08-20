@@ -382,6 +382,14 @@ namespace egihash
 			mkcache(seed, callback);
 		}
 
+		impl_t(uint64_t epoch, uint64_t size, ::std::function<bool(void *, size_type)> read, progress_callback_type callback)
+		: epoch(epoch)
+		, size(size)
+		, data()
+		{
+			load(read, callback);
+		}
+
 		void mkcache(::std::string const & seed, progress_callback_type callback)
 		{
 			size_t n = size / constants::HASH_BYTES;
@@ -457,6 +465,11 @@ namespace egihash
 	{
 	}
 
+	cache_t::cache_t(uint64_t epoch, uint64_t size, ::std::function<bool(void *, size_type)> read, progress_callback_type callback)
+	: impl(new impl_t(epoch, size, read, callback))
+	{
+	}
+
 	uint64_t cache_t::epoch() const
 	{
 		return impl->epoch;
@@ -500,18 +513,10 @@ namespace egihash
 
 		impl_t(::std::function<bool(void *, size_type)> read, dag_file_header_t & header, progress_callback_type callback)
 		: epoch(header.epoch)
-		, size(0)
-		, cache(max_epoch, "")
+		, size(header.dag_end - header.dag_begin)
+		, cache(header.epoch, header.cache_end - header.cache_begin, read, callback)
 		, data()
 		{
-			epoch = header.epoch;
-			size = header.dag_end - header.dag_begin;
-			cache.impl->epoch = header.epoch;
-			cache.impl->size = header.cache_end - header.cache_begin;
-
-			// load the cache
-			cache.load(read, callback);
-
 			// load the DAG
 			size_type dag_hash_count = size / constants::HASH_BYTES;
 			data.resize(dag_hash_count);
@@ -720,7 +725,7 @@ namespace egihash
 
 		dag_file_header_t header(read);
 
-		if ((header.cache_end >= static_cast<size_type>(filesize)) || (header.dag_end > static_cast<size_type>(filesize)))
+		if ((header.cache_end >= static_cast<size_type>(filesize)) || (header.dag_end > (static_cast<size_type>(filesize) + 1)))
 		{
 			throw hash_exception("DAG is corrupt");
 		}

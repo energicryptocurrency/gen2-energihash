@@ -164,19 +164,31 @@ namespace egihash
 		*/
 		data_type const & data() const;
 
-		/** \brief Load a cache from disk.
-		*
-		*	\param read A function which will read cache data from disk.
-		*	\param callback (optional) may be used to monitor the progress of cache loading. Return false to cancel, true to continue.
-		*/
-		void load(::std::function<bool(void *, size_type)> read, progress_callback_type callback = [](size_type, size_type, int){ return true; });
-
 		/** \brief Get the size of the cache data in bytes.
 		*
 		*	\param block_number is the block number for which cache size to compute.
 		*	\returns size_type representing the size of the cache data in bytes.
 		*/
 		static size_type get_cache_size(uint64_t const block_number) noexcept;
+
+	private:
+		friend struct dag_t;
+
+		/** \brief Construct a cache_t by loading from disk.
+		*
+		*	\param epoch is the number of the epoch for the cache we are loading.
+		*	\param size is the size in bytes of the cache we are loading.
+		*	\param read A function which will read cache data from disk.
+		*	\param callback (optional) may be used to monitor the progress of cache loading. Return false to cancel, true to continue.
+		*/
+		cache_t(uint64_t epoch, uint64_t size, ::std::function<bool(void *, size_type)> read, progress_callback_type callback = [](size_type, size_type, int){ return true; });
+
+		/** \brief Load a cache from disk.
+		*
+		*	\param read A function which will read cache data from disk.
+		*	\param callback (optional) may be used to monitor the progress of cache loading. Return false to cancel, true to continue.
+		*/
+		void load(::std::function<bool(void *, size_type)> read, progress_callback_type callback = [](size_type, size_type, int){ return true; });
 
 		/** \brief cache_t private implementation.
 		*/
