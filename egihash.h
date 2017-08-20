@@ -188,9 +188,9 @@ namespace egihash
 	*	Note that this function will own whatever data it needs to perform the read, i.e. the filestream.
 	*	\param dst points to the memory location that should be read into.
 	*	\param count represents the number of bytes to read.
-	*	\return true if the read was successful, false otherwise.
+	*	\throws hash_exception if the read failed
 	*/
-	using read_function_type = ::std::function<bool(void * dst, ::std::size_t count)>;
+	using read_function_type = ::std::function<void(void * dst, ::std::size_t count)>;
 
 	/** \brief cache_t is the cache used to compute a DAG for a given epoch.
 	*

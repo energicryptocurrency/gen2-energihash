@@ -683,11 +683,14 @@ namespace egihash
 			throw hash_exception("Could not open DAG file.");
 		}
 
-		auto read = [&fs](void * dst, size_type count) -> bool
+		auto read = [&fs](void * dst, size_type count)
 		{
 			// TODO: read values in as little endian
 			fs.read(reinterpret_cast<char *>(dst), count);
-			return fs.good();
+			if (!fs.good())
+			{
+				throw hash_exception("Read failure");
+			}
 		};
 
 		fs.seekg(0, ios::end);
