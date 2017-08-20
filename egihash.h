@@ -30,7 +30,7 @@ namespace egihash
 
 		/** \brief DAG_FILE_MINIMUM_SIZE is the size of the DAG file at epoch 0.
 		*/
-		static constexpr uint64_t DAG_FILE_MINIMUM_SIZE = 1090516865;
+		static constexpr uint64_t DAG_FILE_MINIMUM_SIZE = 1090516864;
 
 		/** \brief CALLBACK_FREQUENCY determines how often callbacks will be called.
 		*

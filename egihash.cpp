@@ -679,11 +679,11 @@ namespace egihash
 		}
 
 		fs.seekg(0, ios::end);
-		auto const filesize = fs.tellg();
+		dag::size_type const filesize = static_cast<dag::size_type>(fs.tellg());
 		fs.seekg(0, ios::beg);
 
 		// check minimum dag size
-		if (filesize < static_cast<int64_t>(constants::DAG_FILE_MINIMUM_SIZE))
+		if (filesize < constants::DAG_FILE_MINIMUM_SIZE)
 		{
 			throw hash_exception("DAG is corrupt");
 		}
@@ -717,6 +717,7 @@ namespace egihash
 			// need to consume part of the buffer and then read more
 			if (count > static_cast<size_type>(buffer_ptr_end - buffer_ptr))
 			{
+				//::std::cout << ::std::endl << "hit boundary, asked for " << count << " bytes but " << buffer_ptr_end - buffer_ptr << " remaining in buffer." << ::std::endl;
 				::std::memcpy(dst, buffer_ptr, buffer_ptr_end - buffer_ptr);
 				count -= (buffer_ptr_end - buffer_ptr);
 				dst = reinterpret_cast<char*>(dst) + (buffer_ptr_end - buffer_ptr);
@@ -736,7 +737,7 @@ namespace egihash
 
 		dag_file_header_t header(read);
 
-		if ((header.cache_end >= static_cast<size_type>(filesize)) || (header.dag_end > (static_cast<size_type>(filesize) + 1)))
+		if ((header.cache_end >= filesize) || (header.dag_end > (filesize + 1)))
 		{
 			throw hash_exception("DAG is corrupt");
 		}
