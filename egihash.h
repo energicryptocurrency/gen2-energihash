@@ -10,12 +10,124 @@
 
 #include <functional>
 #include <memory>
+#include <stdexcept>
 #include <type_traits>
 #include <vector>
 
 namespace egihash
 {
-	bool test_function();
+	bool test_function() noexcept;
+
+	namespace constants
+	{
+		/** \brief DAG_MAGIC_BYTES is the starting sequence of a DAG file, used for identification.
+		*/
+		static constexpr char DAG_MAGIC_BYTES[] = "EGIHASH_DAG";
+
+		/** \brief DAG_FILE_HEADER_SIZE is the expected size of a DAG file header.
+		*/
+		static constexpr uint32_t DAG_FILE_HEADER_SIZE = 64u;
+
+		/** \brief DAG_FILE_MINIMUM_SIZE is the size of the DAG file at epoch 0.
+		*/
+		static constexpr uint64_t DAG_FILE_MINIMUM_SIZE = 1090516864;
+
+		/** \brief CALLBACK_FREQUENCY determines how often callbacks will be called.
+		*
+		*	1 means every iteration, 10 means every 10th iteration, and so on...
+		*/
+		static constexpr uint32_t CALLBACK_FREQUENCY = 1024u;
+
+		/** \brief The major version of egihash
+		*/
+		static constexpr uint32_t MAJOR_VERSION = 1u;
+
+		/** \brief The revision number (middle version digit) of egihash
+		*/
+		static constexpr uint32_t REVISION = 23u;
+
+		/** \brief The minor version number of egihash
+		*/
+		static constexpr uint32_t MINOR_VERSION = 0u;
+
+		/** \brief Number of bytes in a hash word.
+		*/
+		static constexpr uint32_t WORD_BYTES = 4u;
+
+		/** \brief The number of bytes in the dataset at genesis.
+		*/
+		static constexpr uint32_t DATASET_BYTES_INIT = 1u << 30u;
+
+		/** \brief The growth of the dataset in bytes per epoch.
+		*/
+		static constexpr uint32_t DATASET_BYTES_GROWTH = 1u << 23u;
+
+		/** \brief The number of bytes in the cache at genesis.
+		*/
+		static constexpr uint32_t CACHE_BYTES_INIT = 1u << 24u;
+
+		/** \brief The growth of the cache in bytes per epoch.
+		*/
+		static constexpr uint32_t CACHE_BYTES_GROWTH = 1u << 17u;
+
+		/** \brief Ratio of the size of the DAG in bytes relative to the size of the cache in bytes..
+		*/
+		static constexpr uint32_t CACHE_MULTIPLIER=1024u;
+
+		/** \brief The number of blocks which constitute one epoch.
+		*
+		*	The DAG and cache must be regenerated once per epoch.
+		*/
+		static constexpr uint32_t EPOCH_LENGTH = 30000u;
+
+		/** \brief The width of the mix hash for egihash.
+		*/
+		static constexpr uint32_t MIX_BYTES = 128u;
+
+		/** \brief The size of an egihash in bytes.
+		*/
+		static constexpr uint32_t HASH_BYTES = 64u;
+
+		/** \brief The number of parents for each element in the DAG.
+		*/
+		static constexpr uint32_t DATASET_PARENTS = 256u;
+
+		/** \brief The number of hashing rounds used to produce the cache.
+		*/
+		static constexpr uint32_t CACHE_ROUNDS = 3u;
+
+		/** \brief The number of DAG lookups to compute an egihash.
+		*/
+		static constexpr uint32_t ACCESSES = 64u;
+
+		// TODO: C API
+		//static constexpr EGIHASH_NAMESPACE(h256_t) empty_h256 = {{0}};
+		//static constexpr EGIHASH_NAMESPACE(result_t) empty_result = {{{0}}, {{0}}};
+	}
+
+	/** \brief hash_exception indicates an error or cancellation when performing a task within egihash.
+	*
+	*	All functions not marked noexcept may be assumed to throw hash_exception or C++ runtime exceptions.
+	*/
+	class hash_exception : public ::std::runtime_error
+	{
+	public:
+		/** \brief construct a hash_exception from a std::string const &
+		*/
+		hash_exception(std::string const & what_arg) noexcept
+		: runtime_error(what_arg)
+		{
+
+		}
+
+		/** \brief construct a hash_exception from a char const *
+		*/
+		hash_exception(char const * what_arg) noexcept
+		: runtime_error(what_arg)
+		{
+
+		}
+	};
 
 	/** \brief epoch0_seedhash is is the seed hash for the genesis block and first epoch of the DAG.
 	*			All seed hashes for subsequent epochs will be generated from this seedhash.
@@ -74,6 +186,15 @@ namespace egihash
 	*	\return false to cancel whatever action is being performed, true to continue.
 	*/
 	using progress_callback_type = ::std::function<bool (::std::size_t step, ::std::size_t max, progress_callback_phase phase)>;
+
+	/** \brief read_function_type is a function which passed to various objects which perform loading of a file, such as the cache and DAG.
+	*
+	*	Note that this function will own whatever data it needs to perform the read, i.e. the filestream.
+	*	\param dst points to the memory location that should be read into.
+	*	\param count represents the number of bytes to read.
+	*	\throws hash_exception if the read failed
+	*/
+	using read_function_type = ::std::function<void(void * dst, ::std::size_t count)>;
 
 	/** \brief cache_t is the cache used to compute a DAG for a given epoch.
 	*
@@ -139,19 +260,31 @@ namespace egihash
 		*/
 		data_type const & data() const;
 
-		/** \brief Load a cache from disk.
-		*
-		*	\param read A function which will read cache data from disk.
-		*	\param callback (optional) may be used to monitor the progress of cache loading. Return false to cancel, true to continue.
-		*/
-		void load(::std::function<bool(void *, size_type)> read, progress_callback_type callback = [](size_type, size_type, int){ return true; });
-
 		/** \brief Get the size of the cache data in bytes.
 		*
 		*	\param block_number is the block number for which cache size to compute.
 		*	\returns size_type representing the size of the cache data in bytes.
 		*/
 		static size_type get_cache_size(uint64_t const block_number) noexcept;
+
+	private:
+		friend struct dag_t;
+
+		/** \brief Construct a cache_t by loading from disk.
+		*
+		*	\param epoch is the number of the epoch for the cache we are loading.
+		*	\param size is the size in bytes of the cache we are loading.
+		*	\param read A function which will read cache data from disk.
+		*	\param callback (optional) may be used to monitor the progress of cache loading. Return false to cancel, true to continue.
+		*/
+		cache_t(uint64_t epoch, uint64_t size, read_function_type read, progress_callback_type callback = [](size_type, size_type, int){ return true; });
+
+		/** \brief Load a cache from disk.
+		*
+		*	\param read A function which will read cache data from disk.
+		*	\param callback (optional) may be used to monitor the progress of cache loading. Return false to cancel, true to continue.
+		*/
+		void load(read_function_type read, progress_callback_type callback = [](size_type, size_type, int){ return true; });
 
 		/** \brief cache_t private implementation.
 		*/
