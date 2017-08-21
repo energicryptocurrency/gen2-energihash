@@ -692,7 +692,7 @@ namespace egihash
 		// 64MiB was chosen as it is divisible by the constants::CACHE_BYTES_GROWTH and the constants::DATASET_BYTES_GROWTH
 		vector<char> read_buffer(64 * 1024 * 1024, 0);
 		auto buffer_ptr = &read_buffer[0];
-		auto buffer_ptr_end = &read_buffer.back();
+		auto buffer_ptr_end = &read_buffer.back() + 1;
 		// prime the buffer
 		fs.read(buffer_ptr, read_buffer.size());
 		if (fs.fail() && !fs.eof())
@@ -704,7 +704,7 @@ namespace egihash
 		auto read = [&fs, &read_buffer, &buffer_ptr, &buffer_ptr_end, &filesize](void * dst, size_type count)
 		{
 			// full buffer consumed exactly
-			if ((buffer_ptr_end - buffer_ptr) == 0)
+			if ((buffer_ptr_end - buffer_ptr) == 1)
 			{
 				fs.read(&read_buffer[0], read_buffer.size());
 				if (fs.fail() && !fs.eof())
