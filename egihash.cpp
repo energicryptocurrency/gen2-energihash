@@ -1003,11 +1003,29 @@ namespace egihash
 			return true;
 		};
 
-		dag_t d("epoch0_verified.dag", progress);
-		//cout << endl << "Saving DAG..." << endl;
-		cout << endl;
-		d.save("epoch0.dag", progress);
-		cout << endl;
+		{
+			dag_t generated(0, progress); // generate a DAG
+			cout << endl;
+			generated.save("epoch0_generated.dag", progress);
+			cout << endl;
+		}
+
+		// clear the global dag cache
+		dag_cache.clear();
+
+		{
+			dag_t loaded("epoch0_generated.dag", progress);
+			cout << endl;
+			loaded.save("epoch0_loaded.dag", progress);
+			cout << endl;
+		}
+
+
+		//dag_t d("epoch0_verified.dag", progress);
+		////cout << endl << "Saving DAG..." << endl;
+		//cout << endl;
+		//d.save("epoch0.dag", progress);
+		//cout << endl;
 
 		return success;
 	}
