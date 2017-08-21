@@ -26,7 +26,7 @@ namespace egihash
 
 		/** \brief DAG_FILE_HEADER_SIZE is the expected size of a DAG file header.
 		*/
-		static constexpr uint32_t DAG_FILE_HEADER_SIZE = sizeof(DAG_MAGIC_BYTES) + (5 * sizeof(uint64_t)) + (3 * sizeof(uint32_t)) + 2;
+		static constexpr uint32_t DAG_FILE_HEADER_SIZE = 64u;
 
 		/** \brief DAG_FILE_MINIMUM_SIZE is the size of the DAG file at epoch 0.
 		*/

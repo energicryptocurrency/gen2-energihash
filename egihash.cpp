@@ -512,7 +512,7 @@ namespace egihash
 			ofstream fs;
 			fs.open(file_path, ios::out | ios::binary);
 
-			uint64_t cache_begin = constants::DAG_FILE_HEADER_SIZE;
+			uint64_t cache_begin = constants::DAG_FILE_HEADER_SIZE + 1;
 			uint64_t cache_end = cache_begin + cache.size();
 			uint64_t dag_begin = cache_end;
 			uint64_t dag_end = dag_begin + size;
@@ -679,7 +679,7 @@ namespace egihash
 		}
 
 		fs.seekg(0, ios::end);
-		dag::size_type const filesize = static_cast<dag::size_type>(fs.tellg());
+		dag_t::size_type const filesize = static_cast<dag_t::size_type>(fs.tellg());
 		fs.seekg(0, ios::beg);
 
 		// check minimum dag size
