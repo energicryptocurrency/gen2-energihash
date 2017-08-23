@@ -150,20 +150,87 @@ namespace egihash
 	*/
 	struct h256_t
 	{
-		h256_t();
-		// TODO: copy/move ctors/operators & operator bool()
+		/** \brief Default constructor for h256_t fills data field b with 0 bytes
+		*/
+		constexpr h256_t(): b{0} {}
+
+		/** \brief Default copy constructor
+		*/
+		h256_t(h256_t const &) = default;
+
+		/** \brief Default copy assignment operator
+		*/
+		h256_t & operator=(h256_t const &) = default;
+
+		/** \brief Default move constructor
+		*/
+		h256_t(h256_t &&) = default;
+
+		/** \brief Default move assignment operator
+		*/
+		h256_t & operator=(h256_t &&) = default;
+
+		/** \brief Default destructor
+		*/
+		~h256_t() = default;
+
+		/** \brief Test if this hash is valid. Returns true if hash data is not all 0 bytes.
+		*/
+		operator bool() const;
+
+		/** \brief This member stores the 256-bit hash data
+		*/
 		uint8_t b[32];
 	};
+
+	/** \brief A default constructed h256_t has all empty bytes.
+	*/
+	static constexpr h256_t empty_h256;
 
 	/** \brief result_t represents the result of an egihash.
 	*/
 	struct result_t
 	{
-		result_t() = default;
-		// TODO: copy/move ctors/operators & operator bool()
+		/** \brief Default constructor
+		*/
+		constexpr result_t() = default;
+
+		/** \brief Default copy constructor
+		*/
+		result_t(result_t const &) = default;
+
+		/** \brief Default copy assignment operator
+		*/
+		result_t & operator=(result_t const &) = default;
+
+		/** \brief Default move constructor
+		*/
+		result_t(result_t &&) = default;
+
+		/** \brief Default move assignment operator
+		*/
+		result_t & operator=(result_t &&) = default;
+
+		/** \brief Default destructor
+		*/
+		~result_t() = default;
+
+		/** \brief Test if this hash is valid. Returs true of hash data is not all 0 bytes.
+		*/
+		operator bool() const;
+
+		/** \brief This member contains the egihash result value.
+		*/
 		h256_t value;
+
+		/** \brief This member contains the mix hash to produce this result.
+		*/
 		h256_t mixhash;
 	};
+
+	/** \brief A default constructed result_t has all empty bytes.
+	*/
+	static constexpr result_t empty_result;
 
 	/** \brief progress_callback_phase values represent different stages at which a progress callback may be called.
 	*/

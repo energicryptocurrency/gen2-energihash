@@ -294,10 +294,14 @@ namespace
 
 namespace egihash
 {
-	h256_t::h256_t()
-	: b{0}
+	h256_t::operator bool() const
 	{
+		return (::std::memcmp(&b[0], &empty_h256.b[0], sizeof(b)) != 0);
+	}
 
+	result_t::operator bool() const
+	{
+		return bool(value) && bool(mixhash);
 	}
 
 	// TODO: unit tests / validation
