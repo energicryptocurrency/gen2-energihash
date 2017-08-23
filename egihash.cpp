@@ -821,6 +821,8 @@ namespace egihash
 		return impl_t::get_full_size(block_number);
 	}
 
+// TODO: reference code, remove me
+#if 0
 	// TODO: unit tests / validation
 	result_t hashimoto(sha3_256_t::deserialized_hash_t const & header, uint64_t const nonce, size_t const full_size, ::std::function<sha3_512_t::deserialized_hash_t (size_t const)> lookup)
 	{
@@ -887,7 +889,9 @@ namespace egihash
 	{
 		return hashimoto(header, nonce, full_size, [dataset](size_t const x){return dataset.data()[x];});
 	}
+#endif // 0
 
+	// TODO: unify light & full implementation
 	namespace full
 	{
 		result_t hash(dag_t const & dag, void const * input_data, dag_t::size_type input_size)
