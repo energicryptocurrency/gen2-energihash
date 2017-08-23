@@ -888,6 +888,52 @@ namespace egihash
 		return hashimoto(header, nonce, full_size, [dataset](size_t const x){return dataset.data()[x];});
 	}
 
+	namespace full
+	{
+		result_t hash(dag_t const & dag, void const * input_data, dag_t::size_type input_size)
+		{
+			auto const n = dag.size() / constants::HASH_BYTES;
+			static constexpr auto w = constants::MIX_BYTES / constants::WORD_BYTES;
+			static constexpr auto mixhashes = constants::MIX_BYTES / constants::HASH_BYTES;
+
+			sha3_256_t first_hash(input_data, input_size);
+
+			auto s = sha3_512(first_hash.deserialize());
+			decltype(s) mix;
+			for (size_t i = 0; i < (constants::MIX_BYTES / constants::HASH_BYTES); i++)
+			{
+				mix.insert(mix.end(), s.begin(), s.end());
+			}
+
+			for (size_t i = 0; i < constants::ACCESSES; i++)
+			{
+				auto p = fnv(i ^ s[0], mix[i % w]) % (n / mixhashes) * mixhashes;
+				decltype(s) newdata;
+				for (size_t j = 0; j < (constants::MIX_BYTES / constants::HASH_BYTES); j++)
+				{
+					auto const & h = dag.data()[p + j];
+					newdata.insert(newdata.end(), h.begin(), h.end());
+				}
+				for (auto j = mix.begin(), jEnd = mix.end(), k = newdata.begin(), kEnd = newdata.end(); j != jEnd && k != kEnd; j++, k++)
+				{
+					*j = fnv(*j, *k);
+				}
+			}
+
+			decltype(s) cmix;
+			for (size_t i = 0; i < mix.size(); i += 4)
+			{
+				cmix.push_back(fnv(fnv(fnv(mix[i], mix[i+1]), mix[i+2]), mix[i+3]));
+			}
+
+			auto v = sha3_256(s);
+			result_t out;
+			::std::memcpy(&out.value.b[0], &v[0], ::std::min(sizeof(out.value.b), v.size()));
+			::std::memcpy(&out.mixhash.b[0], &cmix[0], ::std::min(sizeof(out.mixhash.b), cmix.size()));
+			return out;
+		}
+	}
+
 	bool test_function_()
 	{
 		using namespace std;
