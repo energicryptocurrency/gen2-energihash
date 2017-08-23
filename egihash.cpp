@@ -294,10 +294,14 @@ namespace
 
 namespace egihash
 {
-	h256_t::h256_t()
-	: b{0}
+	h256_t::operator bool() const
 	{
+		return (::std::memcmp(&b[0], &empty_h256.b[0], sizeof(b)) != 0);
+	}
 
+	result_t::operator bool() const
+	{
+		return bool(value) && bool(mixhash);
 	}
 
 	// TODO: unit tests / validation
@@ -817,6 +821,8 @@ namespace egihash
 		return impl_t::get_full_size(block_number);
 	}
 
+// TODO: reference code, remove me
+#if 0
 	// TODO: unit tests / validation
 	result_t hashimoto(sha3_256_t::deserialized_hash_t const & header, uint64_t const nonce, size_t const full_size, ::std::function<sha3_512_t::deserialized_hash_t (size_t const)> lookup)
 	{
@@ -882,6 +888,100 @@ namespace egihash
 	result_t hashimoto_full(size_t const full_size, dag_t const & dataset, sha3_256_t::deserialized_hash_t const & header, uint64_t const nonce)
 	{
 		return hashimoto(header, nonce, full_size, [dataset](size_t const x){return dataset.data()[x];});
+	}
+#endif // 0
+
+	// TODO: unify light & full implementation
+	namespace full
+	{
+		result_t hash(dag_t const & dag, void const * input_data, dag_t::size_type input_size)
+		{
+			auto const n = dag.size() / constants::HASH_BYTES;
+			static constexpr auto w = constants::MIX_BYTES / constants::WORD_BYTES;
+			static constexpr auto mixhashes = constants::MIX_BYTES / constants::HASH_BYTES;
+
+			sha3_256_t first_hash(input_data, input_size);
+
+			auto s = sha3_512(first_hash.deserialize());
+			decltype(s) mix;
+			for (size_t i = 0; i < (constants::MIX_BYTES / constants::HASH_BYTES); i++)
+			{
+				mix.insert(mix.end(), s.begin(), s.end());
+			}
+
+			for (size_t i = 0; i < constants::ACCESSES; i++)
+			{
+				auto p = fnv(i ^ s[0], mix[i % w]) % (n / mixhashes) * mixhashes;
+				decltype(s) newdata;
+				for (size_t j = 0; j < (constants::MIX_BYTES / constants::HASH_BYTES); j++)
+				{
+					auto const & h = dag.data()[p + j];
+					newdata.insert(newdata.end(), h.begin(), h.end());
+				}
+				for (auto j = mix.begin(), jEnd = mix.end(), k = newdata.begin(), kEnd = newdata.end(); j != jEnd && k != kEnd; j++, k++)
+				{
+					*j = fnv(*j, *k);
+				}
+			}
+
+			decltype(s) cmix;
+			for (size_t i = 0; i < mix.size(); i += 4)
+			{
+				cmix.push_back(fnv(fnv(fnv(mix[i], mix[i+1]), mix[i+2]), mix[i+3]));
+			}
+
+			auto v = sha3_256(s);
+			result_t out;
+			::std::memcpy(&out.value.b[0], &v[0], ::std::min(sizeof(out.value.b), v.size()));
+			::std::memcpy(&out.mixhash.b[0], &cmix[0], ::std::min(sizeof(out.mixhash.b), cmix.size()));
+			return out;
+		}
+	}
+
+	namespace light
+	{
+		result_t hash(cache_t const & cache, void const * input_data, cache_t::size_type input_size)
+		{
+			auto const n = dag_t::get_full_size((cache.epoch() * constants::EPOCH_LENGTH) + 1) / constants::HASH_BYTES;
+			static constexpr auto w = constants::MIX_BYTES / constants::WORD_BYTES;
+			static constexpr auto mixhashes = constants::MIX_BYTES / constants::HASH_BYTES;
+
+			sha3_256_t first_hash(input_data, input_size);
+
+			auto s = sha3_512(first_hash.deserialize());
+			decltype(s) mix;
+			for (size_t i = 0; i < (constants::MIX_BYTES / constants::HASH_BYTES); i++)
+			{
+				mix.insert(mix.end(), s.begin(), s.end());
+			}
+
+			for (size_t i = 0; i < constants::ACCESSES; i++)
+			{
+				auto p = fnv(i ^ s[0], mix[i % w]) % (n / mixhashes) * mixhashes;
+				decltype(s) newdata;
+				for (size_t j = 0; j < (constants::MIX_BYTES / constants::HASH_BYTES); j++)
+				{
+					auto const & h = dag_t::impl_t::calc_dataset_item(cache.data(), p + j);
+					newdata.insert(newdata.end(), h.begin(), h.end());
+				}
+				for (auto j = mix.begin(), jEnd = mix.end(), k = newdata.begin(), kEnd = newdata.end(); j != jEnd && k != kEnd; j++, k++)
+				{
+					*j = fnv(*j, *k);
+				}
+			}
+
+			decltype(s) cmix;
+			for (size_t i = 0; i < mix.size(); i += 4)
+			{
+				cmix.push_back(fnv(fnv(fnv(mix[i], mix[i+1]), mix[i+2]), mix[i+3]));
+			}
+
+			auto v = sha3_256(s);
+			result_t out;
+			::std::memcpy(&out.value.b[0], &v[0], ::std::min(sizeof(out.value.b), v.size()));
+			::std::memcpy(&out.mixhash.b[0], &cmix[0], ::std::min(sizeof(out.mixhash.b), cmix.size()));
+			return out;
+		}
 	}
 
 	bool test_function_()
