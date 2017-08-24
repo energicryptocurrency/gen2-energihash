@@ -327,6 +327,7 @@ namespace egihash
 		{
 			ret += serialize_hash(cache_data);
 		}
+		return ret;
 	}
 
 	// TODO: unit tests / validation
@@ -1302,7 +1303,7 @@ extern "C"
 			// no way to indicate error
 		}
 	}
-
+#endif
 	void egihash_h256_compute(EGIHASH_NAMESPACE(h256_t) * output_hash, void * input_data, uint64_t input_size)
 	{
 		try
@@ -1316,5 +1317,19 @@ extern "C"
 			::std::memset(output_hash->b, 0, 32);
 		}
 	}
-	#endif
+
+	void egihash_h512_compute(EGIHASH_NAMESPACE(h512_t) * output_hash, void * input_data, uint64_t input_size)
+	{
+		try
+		{
+			sha3_512_t hash(input_data, input_size);
+			::std::memcpy(output_hash->b, hash.data, hash.hash_size);
+		}
+		catch (...)
+		{
+			// zero hash data indicates error
+			::std::memset(output_hash->b, 0, 64);
+		}
+	}
+
 }

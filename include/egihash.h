@@ -543,6 +543,7 @@ typedef struct EGIHASH_NAMESPACE(light) * EGIHASH_NAMESPACE(light_t);
 typedef struct EGIHASH_NAMESPACE(full) * EGIHASH_NAMESPACE(full_t);
 typedef struct EGIHASH_NAMESPACE(h256) { uint8_t b[32]; } EGIHASH_NAMESPACE(h256_t);
 typedef struct EGIHASH_NAMESPACE(result) { EGIHASH_NAMESPACE(h256_t) value; EGIHASH_NAMESPACE(h256_t) mixhash; } EGIHASH_NAMESPACE(result_t);
+typedef struct EGIHASH_NAMESPACE(h512) { uint8_t b[64]; } EGIHASH_NAMESPACE(h512_t);
 
 #if 0 // TODO: FIXME
 EGIHASH_NAMESPACE(light_t) EGIHASH_NAMESPACE(light_new)(unsigned int block_number);
@@ -554,9 +555,10 @@ uint64_t EGIHASH_NAMESPACE(full_dag_size)(EGIHASH_NAMESPACE(full_t) full);
 void const * EGIHASH_NAMESPACE(full_dag)(EGIHASH_NAMESPACE(full_t) full);
 EGIHASH_NAMESPACE(result_t) EGIHASH_NAMESPACE(full_compute)(EGIHASH_NAMESPACE(full_t) full, EGIHASH_NAMESPACE(h256_t) header_hash, uint64_t nonce);
 void EGIHASH_NAMESPACE(full_delete)(EGIHASH_NAMESPACE(full_t) full);
+#endif
 
 void egihash_h256_compute(EGIHASH_NAMESPACE(h256_t) * output_hash, void * input_data, uint64_t input_size);
-#endif
+void egihash_h512_compute(EGIHASH_NAMESPACE(h512_t) * output_hash, void * input_data, uint64_t input_size);
 
 #ifdef __cplusplus
 } // extern "C"
