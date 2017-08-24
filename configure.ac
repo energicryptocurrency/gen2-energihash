@@ -42,3 +42,4 @@ AC_CONFIG_FILES(Makefile
                 libegihash/Makefile
                 include/Makefile)
 AC_OUTPUT
+
