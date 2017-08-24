@@ -12,38 +12,93 @@ extern "C"
 #include <algorithm>
 #include <cmath>
 #include <cstring>
-#include <functional>
+#include <fstream>
 #include <iomanip>
 #include <limits>
 #include <map>
-#include <memory>
-#include <stdexcept>
+#include <mutex>
 #include <string>
 #include <sstream>
-#include <vector>
-#include <type_traits>
 #include <iostream> // TODO: remove me (debugging)
 
 namespace
 {
-	namespace constants
-	{
-		constexpr uint32_t WORD_BYTES = 4u;                       // bytes in word
-		constexpr uint32_t DATASET_BYTES_INIT = 1u << 30u;        // bytes in dataset at genesis
-		constexpr uint32_t DATASET_BYTES_GROWTH = 1u << 23u;      // dataset growth per epoch
-		constexpr uint32_t CACHE_BYTES_INIT = 1u << 24u;          // bytes in cache at genesis
-		constexpr uint32_t CACHE_BYTES_GROWTH = 1u << 17u;        // cache growth per epoch
-		constexpr uint32_t CACHE_MULTIPLIER=1024u;                // Size of the DAG relative to the cache
-		constexpr uint32_t EPOCH_LENGTH = 30000u;                 // blocks per epoch
-		constexpr uint32_t MIX_BYTES = 128u;                      // width of mix
-		constexpr uint32_t HASH_BYTES = 64u;                      // hash length in bytes
-		constexpr uint32_t DATASET_PARENTS = 256u;                // number of parents of each dataset element
-		constexpr uint32_t CACHE_ROUNDS = 3u;                     // number of rounds in cache production
-		constexpr uint32_t ACCESSES = 64u;                        // number of accesses in hashimoto loop
+	using namespace egihash;
 
-		constexpr EGIHASH_NAMESPACE(h256_t) empty_h256 = {{0}};
-		constexpr EGIHASH_NAMESPACE(result_t) empty_result = {{{0}}, {{0}}};
-	}
+#pragma pack(push, 1)
+	struct dag_file_header_t
+	{
+		static constexpr size_t magic_size = sizeof(constants::DAG_MAGIC_BYTES);
+		using size_type = dag_t::size_type;
+
+		char magic[magic_size];
+		uint32_t major_version;
+		uint32_t revision;
+		uint32_t minor_version;
+		uint64_t epoch;
+		uint64_t cache_begin;
+		uint64_t cache_end;
+		uint64_t dag_begin;
+		uint64_t dag_end;
+
+		dag_file_header_t() = delete;
+		dag_file_header_t(dag_file_header_t const &) = default;
+		dag_file_header_t & operator=(dag_file_header_t const &) = default;
+		dag_file_header_t(dag_file_header_t &&) = default;
+		dag_file_header_t & operator=(dag_file_header_t &&) = default;
+		~dag_file_header_t() = default;
+
+		dag_file_header_t(read_function_type read)
+		: magic{0}
+		, major_version(0)
+		, revision(0)
+		, minor_version(0)
+		, epoch(0)
+		, cache_begin(0)
+		, cache_end(0)
+		, dag_begin(0)
+		, dag_end(0)
+		{
+			read(magic, magic_size);
+
+			if (std::string(magic) != constants::DAG_MAGIC_BYTES)
+			{
+				throw hash_exception("Not a DAG file");
+			}
+
+			read(&major_version, sizeof(major_version));
+			read(&revision, sizeof(revision));
+			read(&minor_version, sizeof(minor_version));
+			if ((major_version != constants::MAJOR_VERSION) || (revision != constants::REVISION))
+			{
+				throw hash_exception("DAG version is invalid");
+			}
+
+			read(&epoch, sizeof(epoch));
+			read(&cache_begin, sizeof(cache_begin));
+			read(&cache_end, sizeof(cache_end));
+			read(&dag_begin, sizeof(dag_begin));
+			read(&dag_end, sizeof(dag_end));
+
+			// validate size of cache
+			cache_t::size_type cache_size = cache_t::get_cache_size((epoch * constants::EPOCH_LENGTH) + 1);
+			if ((cache_end <= cache_begin) || (cache_size != (cache_end - cache_begin)))
+			{
+				throw hash_exception("DAG cache is corrupt");
+			}
+
+			// validate size of DAG
+			uint64_t const size = dag_t::get_full_size((epoch * constants::EPOCH_LENGTH) + 1); // get the correct dag size
+			if ((dag_end <= dag_begin) || (size != (dag_end - dag_begin)))
+			{
+				throw hash_exception("DAG is corrupt");
+			}
+		}
+	};
+#pragma pack(pop)
+
+	static_assert(dag_file_header_t::magic_size == 12, "Magic size invalid.");
+	static_assert(sizeof(dag_file_header_t) == 64, "Dag header size invalid.");
 
 	inline int32_t decode_int(uint8_t const * data, uint8_t const * dataEnd) noexcept
 	{
@@ -99,30 +154,6 @@ namespace
 		return true;
 	}
 
-	uint64_t get_cache_size(uint64_t block_number) noexcept
-	{
-		using namespace constants;
-
-		uint64_t cache_size = (CACHE_BYTES_INIT + (CACHE_BYTES_GROWTH * (block_number / EPOCH_LENGTH))) - HASH_BYTES;
-		while (!is_prime(cache_size / HASH_BYTES))
-		{
-			cache_size -= (2 * HASH_BYTES);
-		}
-		return cache_size;
-	}
-
-	uint64_t get_full_size(uint64_t block_number) noexcept
-	{
-		using namespace constants;
-
-		uint64_t full_size = (DATASET_BYTES_INIT + (DATASET_BYTES_GROWTH * (block_number / EPOCH_LENGTH))) - MIX_BYTES;
-		while (!is_prime(full_size / MIX_BYTES))
-		{
-			full_size -= (2 * MIX_BYTES);
-		}
-		return full_size;
-	}
-
 	inline uint32_t fnv(uint32_t v1, uint32_t v2) noexcept
 	{
 		constexpr uint32_t FNV_PRIME = 0x01000193ull;             // prime number used for FNV hash function
@@ -130,22 +161,6 @@ namespace
 
 		return ((v1 * FNV_PRIME) ^ v2) % FNV_MODULUS;
 	}
-
-	class hash_exception : public ::std::runtime_error
-	{
-	public:
-		hash_exception(std::string const & what_arg) noexcept
-		: runtime_error(what_arg)
-		{
-
-		}
-
-		hash_exception(char const * what_arg) noexcept
-		: runtime_error(what_arg)
-		{
-
-		}
-	};
 
 	template <size_t HashSize, int (*HashFunction)(uint8_t *, size_t, uint8_t const * in, size_t)>
 	struct sha3_base
@@ -279,6 +294,16 @@ namespace
 
 namespace egihash
 {
+	h256_t::operator bool() const
+	{
+		return (::std::memcmp(&b[0], &empty_h256.b[0], sizeof(b)) != 0);
+	}
+
+	result_t::operator bool() const
+	{
+		return bool(value) && bool(mixhash);
+	}
+
 	// TODO: unit tests / validation
 	template <typename T>
 	sha3_512_t::deserialized_hash_t sha3_512(T const & data)
@@ -312,9 +337,9 @@ namespace egihash
 	}
 
 	// TODO: unit tests / validation
-	::std::string get_seedhash(size_t const block_number)
+	::std::string get_seedhash(uint64_t const block_number)
 	{
-		::std::string s(32, 0);
+		::std::string s(epoch0_seedhash);
 		for (size_t i = 0; i < (block_number / constants::EPOCH_LENGTH); i++)
 		{
 			s = sha3_256_t::serialize(sha3_256(s));
@@ -322,77 +347,484 @@ namespace egihash
 		return s;
 	}
 
-	// TODO: unit tests / validation
-	::std::vector<sha3_512_t::deserialized_hash_t> mkcache(size_t const cache_size, ::std::string seed)
+	struct cache_t::impl_t
 	{
-		size_t n = cache_size / constants::HASH_BYTES;
+		using size_type = cache_t::size_type;
+		using data_type = ::std::vector<::std::vector<int32_t>>;
 
-		::std::vector<sha3_512_t::deserialized_hash_t> o{sha3_512(seed)};
-		for (size_t i = 1; i < n; i++)
+		impl_t(uint64_t const block_number, ::std::string const & seed, progress_callback_type callback)
+		: epoch(block_number / constants::EPOCH_LENGTH)
+		, size(get_cache_size(block_number))
+		, data()
 		{
-			o.push_back(sha3_512(o.back()));
+			mkcache(seed, callback);
 		}
 
-		for (size_t i = 0; i < constants::CACHE_ROUNDS; i++)
+		impl_t(uint64_t epoch, uint64_t size, read_function_type read, progress_callback_type callback)
+		: epoch(epoch)
+		, size(size)
+		, data()
 		{
-			for (size_t j = 0; j < n; j++)
+			load(read, callback);
+		}
+
+		void mkcache(::std::string const & seed, progress_callback_type callback)
+		{
+			size_t n = size / constants::HASH_BYTES;
+
+			data.reserve(n);
+			data.push_back(sha3_512(seed));
+			for (size_t i = 1; i < n; i++)
 			{
-				auto v = o[j][0] % n;
-				auto & u = o[(j-1+n)%n];
-				size_t count = 0;
-				for (auto & k : u)
+				data.push_back(sha3_512(data.back()));
+				if (((i % constants::CALLBACK_FREQUENCY) == 0) && !callback(i, n, cache_seeding))
 				{
-					count++;
-					k = k ^ o[v][count];
+					throw hash_exception("Cache creation cancelled.");
 				}
-				o[i] = sha3_512(u);
 			}
-		}
 
-		return o;
-	}
-
-	// TODO: unit tests / validation
-	sha3_512_t::deserialized_hash_t calc_dataset_item(::std::vector<sha3_512_t::deserialized_hash_t> const & cache, size_t const i)
-	{
-		size_t const n = cache.size();
-		constexpr size_t r = constants::HASH_BYTES / constants::WORD_BYTES;
-		sha3_512_t::deserialized_hash_t mix;
-		std::copy(cache[i%n].begin(), cache[i%n].end(), mix.begin());
-		mix[0] ^= i;
-		mix = sha3_512(mix);
-		for (size_t j = 0; j < constants::DATASET_PARENTS; j++)
-		{
-			size_t const cache_index = fnv(i ^ j, mix[j % r]);
-			auto l = cache[cache_index % n].begin();
-			auto lEnd = cache[cache_index % n].end();
-			for (auto k = mix.begin(), kEnd = mix.end();
-				((k != kEnd) && (l != lEnd)); k++, l++)
+			size_t progress_counter = 0;
+			for (size_t i = 0; i < constants::CACHE_ROUNDS; i++)
 			{
-				*k = fnv(*k, *l);
+				for (size_t j = 0; j < n; j++)
+				{
+					auto v = data[j][0] % n;
+					auto & u = data[(j-1+n)%n];
+					size_t count = 0;
+					for (auto & k : u)
+					{
+						k = k ^ data[v][count++];
+					}
+					data[i] = sha3_512(u);
+					if (((i % constants::CALLBACK_FREQUENCY) == 0) && !callback(progress_counter++, n * constants::CACHE_ROUNDS, cache_generation))
+					{
+						throw hash_exception("Cache creation cancelled.");
+					}
+				}
 			}
-
 		}
-		return sha3_512(mix);
-	}
 
-	// TODO: unit tests / validation
-	::std::vector<sha3_512_t::deserialized_hash_t> calc_dataset(::std::vector<sha3_512_t::deserialized_hash_t> const & cache, size_t const full_size, EGIHASH_NAMESPACE(callback) progress_callback)
-	{
-		::std::vector<sha3_512_t::deserialized_hash_t> out;
-		for (size_t i = 0; i < (full_size / constants::HASH_BYTES); i++)
+		void load(read_function_type read, progress_callback_type callback)
 		{
-			out.push_back(calc_dataset_item(cache, i));
-			if (progress_callback(i) != 0)
+			size_type const cache_hash_count = size / constants::HASH_BYTES;
+
+			data.resize(cache_hash_count);
+			size_t count = 0;
+			for (auto & i : data)
 			{
-				throw hash_exception("DAG creation cancelled.");
+				i.resize(constants::HASH_BYTES / constants::WORD_BYTES);
+				read(&i[0], constants::HASH_BYTES);
+				if (((++count % constants::CALLBACK_FREQUENCY) == 0) && !callback(count, cache_hash_count, cache_loading))
+				{
+					throw hash_exception("Cache loading cancelled.");
+				}
 			}
 		}
-		return out;
+
+		static size_type get_cache_size(uint64_t block_number) noexcept
+		{
+			using namespace constants;
+
+			size_type cache_size = (CACHE_BYTES_INIT + (CACHE_BYTES_GROWTH * (block_number / EPOCH_LENGTH))) - HASH_BYTES;
+			while (!is_prime(cache_size / HASH_BYTES))
+			{
+				cache_size -= (2 * HASH_BYTES);
+			}
+			return cache_size;
+		}
+
+		uint64_t epoch;
+		size_type size;
+		data_type data;
+	};
+
+	cache_t::cache_t(uint64_t const block_number, ::std::string const & seed, progress_callback_type callback)
+	: impl(new impl_t(block_number, seed, callback))
+	{
 	}
 
+	cache_t::cache_t(uint64_t epoch, uint64_t size, read_function_type read, progress_callback_type callback)
+	: impl(new impl_t(epoch, size, read, callback))
+	{
+	}
+
+	uint64_t cache_t::epoch() const
+	{
+		return impl->epoch;
+	}
+
+	cache_t::size_type cache_t::size() const
+	{
+		return impl->size;
+	}
+
+	cache_t::data_type const & cache_t::data() const
+	{
+		return impl->data;
+	}
+
+	void cache_t::load(read_function_type read, progress_callback_type callback)
+	{
+		impl->load(read, callback);
+	}
+
+	cache_t::size_type cache_t::get_cache_size(uint64_t const block_number) noexcept
+	{
+		return impl_t::get_cache_size(block_number);
+	}
+
+	struct dag_t::impl_t
+	{
+		using size_type = dag_t::size_type;
+		using data_type = ::std::vector<::std::vector<int32_t>>;
+		using dag_cache_map = ::std::map<uint64_t /* epoch */, ::std::shared_ptr<impl_t>>;
+		static constexpr uint64_t max_epoch = ::std::numeric_limits<uint64_t>::max();
+
+		impl_t(uint64_t block_number, progress_callback_type callback)
+		: epoch(block_number / constants::EPOCH_LENGTH)
+		, size(get_full_size(block_number))
+		, cache(block_number, get_seedhash(block_number), callback)
+		, data()
+		{
+			generate(callback);
+		}
+
+		impl_t(read_function_type read, dag_file_header_t & header, progress_callback_type callback)
+		: epoch(header.epoch)
+		, size(header.dag_end - header.dag_begin)
+		, cache(header.epoch, header.cache_end - header.cache_begin, read, callback)
+		, data()
+		{
+			// load the DAG
+			size_type dag_hash_count = size / constants::HASH_BYTES;
+			data.resize(dag_hash_count);
+			size_t count = 0;
+			for (auto & i : data)
+			{
+				i.resize(constants::HASH_BYTES / constants::WORD_BYTES);
+				read(&i[0], constants::HASH_BYTES);
+				if (((++count % constants::CALLBACK_FREQUENCY) == 0) && !callback(count, data.size(), dag_loading))
+				{
+					throw hash_exception("DAG loading cancelled.");
+				}
+			}
+		}
+
+		void save(::std::string const & file_path, progress_callback_type callback) const
+		{
+			using namespace std;
+			ofstream fs;
+			fs.open(file_path, ios::out | ios::binary);
+
+			uint64_t cache_begin = constants::DAG_FILE_HEADER_SIZE + 1;
+			uint64_t cache_end = cache_begin + cache.size();
+			uint64_t dag_begin = cache_end;
+			uint64_t dag_end = dag_begin + size;
+
+			auto write = [&fs](void const * data, size_type count)
+			{
+				// TODO: write all value in little endian
+				fs.write(reinterpret_cast<char const *>(data), count);
+				if (fs.fail())
+				{
+					throw hash_exception("Write failure");
+				}
+			};
+
+			write(constants::DAG_MAGIC_BYTES, sizeof(constants::DAG_MAGIC_BYTES));
+			write(&constants::MAJOR_VERSION, sizeof(constants::MAJOR_VERSION));
+			write(&constants::REVISION, sizeof(constants::REVISION));
+			write(&constants::MINOR_VERSION, sizeof(constants::MINOR_VERSION));
+			write(&epoch, sizeof(epoch));
+			write(&cache_begin, sizeof(cache_begin));
+			write(&cache_end, sizeof(cache_end));
+			write(&dag_begin, sizeof(dag_begin));
+			write(&dag_end, sizeof(dag_end));
+
+			size_t max_count = cache.size() + data.size();
+			size_t count = 0;
+			for (auto const & i : cache.data())
+			{
+				for (auto const & j : i)
+				{
+					write(&j, sizeof(j));
+				}
+				if (((++count % constants::CALLBACK_FREQUENCY) == 0) && !callback(count, max_count, dag_saving))
+				{
+					throw hash_exception("DAG save cancelled.");
+				}
+			}
+
+			for (auto const & i : data)
+			{
+				for (auto const & j : i)
+				{
+					write(&j, sizeof(j));
+				}
+				if (((++count % constants::CALLBACK_FREQUENCY) == 0) && !callback(count, max_count, dag_saving))
+				{
+					throw hash_exception("DAG save cancelled.");
+				}
+			}
+		}
+
+		void generate(progress_callback_type callback)
+		{
+			size_type const n = size / constants::HASH_BYTES;
+			data.reserve(n);
+			for (size_type i = 0; i < n; i++)
+			{
+				data.push_back(calc_dataset_item(cache.data(), i));
+				if ((i % constants::CALLBACK_FREQUENCY) == 0 && !callback(i, n, dag_generation))
+				{
+					throw hash_exception("DAG creation cancelled.");
+				}
+			}
+		}
+
+		static data_type::value_type calc_dataset_item(::std::vector<sha3_512_t::deserialized_hash_t> const & cache, size_type const i)
+		{
+			size_type const n = cache.size();
+			constexpr size_type r = constants::HASH_BYTES / constants::WORD_BYTES;
+			sha3_512_t::deserialized_hash_t mix(cache[i%n]);
+			mix[0] ^= i;
+			mix = sha3_512(mix);
+			for (size_type j = 0; j < constants::DATASET_PARENTS; j++)
+			{
+				size_type const cache_index = fnv(i ^ j, mix[j % r]);
+				auto l = cache[cache_index % n].begin();
+				auto lEnd = cache[cache_index % n].end();
+				for (auto k = mix.begin(), kEnd = mix.end();
+					((k != kEnd) && (l != lEnd)); k++, l++)
+				{
+					*k = fnv(*k, *l);
+				}
+
+			}
+			return sha3_512(mix);
+		}
+
+		cache_t get_cache() const
+		{
+			return cache;
+		}
+
+		static size_type get_full_size(uint64_t const block_number) noexcept
+		{
+			using namespace constants;
+
+			uint64_t full_size = (DATASET_BYTES_INIT + (DATASET_BYTES_GROWTH * (block_number / EPOCH_LENGTH))) - MIX_BYTES;
+			while (!is_prime(full_size / MIX_BYTES))
+			{
+				full_size -= (2 * MIX_BYTES);
+			}
+			return full_size;
+		}
+
+		uint64_t epoch;
+		size_type size;
+		cache_t cache;
+		data_type data;
+	};
+
+	static dag_t::impl_t::dag_cache_map dag_cache;
+	static ::std::mutex dag_cache_mutex;
+
+	::std::shared_ptr<dag_t::impl_t> get_dag(uint64_t block_number, progress_callback_type callback)
+	{
+		using namespace std;
+		uint64_t epoch_number = block_number / constants::EPOCH_LENGTH;
+
+		// if we have the correct DAG already loaded, return it from the cache
+		{
+			lock_guard<mutex> lock(dag_cache_mutex);
+			auto const dag_cache_iterator = dag_cache.find(epoch_number);
+			if (dag_cache_iterator != dag_cache.end())
+			{
+				return dag_cache_iterator->second;
+			}
+		}
+
+		// otherwise create the dag and add it to the cache
+		// this is not locked as it can be a lengthy process and we don't want to block access to the dag cache
+		shared_ptr<dag_t::impl_t> impl(new dag_t::impl_t(block_number, callback));
+
+		lock_guard<mutex> lock(dag_cache_mutex);
+		auto insert_pair = dag_cache.insert(make_pair(epoch_number, impl));
+
+		// if insert succeded, return the dag
+		if (insert_pair.second)
+		{
+			return insert_pair.first->second;
+		}
+
+		// if insert failed, it's probably already been inserted
+		auto const dag_cache_iterator = dag_cache.find(epoch_number);
+		if (dag_cache_iterator != dag_cache.end())
+		{
+			return dag_cache_iterator->second;
+		}
+
+		// we couldn't insert it and it's not in the cache
+		throw hash_exception("Could not get DAG");
+	}
+
+	::std::shared_ptr<dag_t::impl_t> get_dag(::std::string const & file_path, progress_callback_type callback)
+	{
+		using namespace std;
+		using size_type = dag_t::size_type;
+
+		ifstream fs;
+		fs.open(file_path, ios::in | ios::binary);
+
+		if (fs.fail())
+		{
+			throw hash_exception("Could not open DAG file.");
+		}
+
+		fs.seekg(0, ios::end);
+		dag_t::size_type const filesize = static_cast<dag_t::size_type>(fs.tellg());
+		fs.seekg(0, ios::beg);
+
+		// check minimum dag size
+		if (filesize < constants::DAG_FILE_MINIMUM_SIZE)
+		{
+			throw hash_exception("DAG is corrupt");
+		}
+
+		// data for 64MiB reads
+		// 64MiB was chosen as it is divisible by the constants::CACHE_BYTES_GROWTH and the constants::DATASET_BYTES_GROWTH
+		vector<char> read_buffer(64 * 1024 * 1024, 0);
+		auto buffer_ptr = &read_buffer[0];
+		auto buffer_ptr_end = &read_buffer.back() + 1;
+		// prime the buffer
+		fs.read(buffer_ptr, read_buffer.size());
+		if (fs.fail() && !fs.eof())
+		{
+			throw hash_exception("Read failure");
+		}
+
+		// TODO: this func needs to be made endian safe
+		auto read = [&fs, &read_buffer, &buffer_ptr, &buffer_ptr_end, &filesize](void * dst, size_type count)
+		{
+			// full buffer consumed exactly
+			if ((buffer_ptr_end - buffer_ptr) == 1)
+			{
+				fs.read(&read_buffer[0], read_buffer.size());
+				if (fs.fail() && !fs.eof())
+				{
+					throw hash_exception("Read failure");
+				}
+				buffer_ptr = &read_buffer[0];
+			}
+
+			// need to consume part of the buffer and then read more
+			if (count > static_cast<size_type>(buffer_ptr_end - buffer_ptr))
+			{
+				//::std::cout << ::std::endl << "hit boundary, asked for " << count << " bytes but " << buffer_ptr_end - buffer_ptr << " remaining in buffer." << ::std::endl;
+				::std::memcpy(dst, buffer_ptr, buffer_ptr_end - buffer_ptr);
+				count -= (buffer_ptr_end - buffer_ptr);
+				dst = reinterpret_cast<char*>(dst) + (buffer_ptr_end - buffer_ptr);
+
+				fs.read(&read_buffer[0], read_buffer.size());
+				if (fs.fail() && !fs.eof())
+				{
+					throw hash_exception("Read failure");
+				}
+				buffer_ptr = &read_buffer[0];
+			}
+
+			// copy from the buffer
+			::std::memcpy(dst, buffer_ptr, count);
+			buffer_ptr += count;
+		};
+
+		dag_file_header_t header(read);
+
+		if ((header.cache_end >= filesize) || (header.dag_end > (filesize + 1)))
+		{
+			throw hash_exception("DAG is corrupt");
+		}
+
+		// if we have the correct DAG already loaded, return it from the cache
+		{
+			lock_guard<mutex> lock(dag_cache_mutex);
+			auto const dag_cache_iterator = dag_cache.find(header.epoch);
+			if (dag_cache_iterator != dag_cache.end())
+			{
+				return dag_cache_iterator->second;
+			}
+		}
+
+		// otherwise create the dag and add it to the cache
+		// this is not locked as it can be a lengthy process and we don't want to block access to the dag cache
+		shared_ptr<dag_t::impl_t> impl(new dag_t::impl_t(read, header, callback));
+
+		lock_guard<mutex> lock(dag_cache_mutex);
+		auto insert_pair = dag_cache.insert(make_pair(header.epoch, impl));
+
+		// if insert succeded, return the dag
+		if (insert_pair.second)
+		{
+			return insert_pair.first->second;
+		}
+
+		// if insert failed, it's probably already been inserted
+		auto const dag_cache_iterator = dag_cache.find(header.epoch);
+		if (dag_cache_iterator != dag_cache.end())
+		{
+			return dag_cache_iterator->second;
+		}
+
+		// we couldn't insert it and it's not in the cache
+		throw hash_exception("Could not get DAG");
+	}
+
+	dag_t::dag_t(uint64_t block_number, progress_callback_type callback)
+	: impl(get_dag(block_number, callback))
+	{
+	}
+
+	dag_t::dag_t(::std::string const & file_path, progress_callback_type callback)
+	: impl(get_dag(file_path, callback))
+	{
+
+	}
+
+	uint64_t dag_t::epoch() const
+	{
+		return impl->epoch;
+	}
+
+	dag_t::size_type dag_t::size() const
+	{
+		return impl->size;
+	}
+
+	dag_t::data_type const & dag_t::data() const
+	{
+		return impl->data;
+	}
+
+	void dag_t::save(::std::string const & file_path, progress_callback_type callback) const
+	{
+		impl->save(file_path, callback);
+	}
+
+	cache_t dag_t::get_cache() const
+	{
+		return impl->get_cache();
+	}
+
+	dag_t::size_type dag_t::get_full_size(uint64_t const block_number) noexcept
+	{
+		return impl_t::get_full_size(block_number);
+	}
+
+// TODO: reference code, remove me
+#if 0
 	// TODO: unit tests / validation
-	decltype(auto) hashimoto(sha3_256_t::deserialized_hash_t const & header, uint64_t const nonce, size_t const full_size, ::std::function<sha3_512_t::deserialized_hash_t (size_t const)> lookup)
+	result_t hashimoto(sha3_256_t::deserialized_hash_t const & header, uint64_t const nonce, size_t const full_size, ::std::function<sha3_512_t::deserialized_hash_t (size_t const)> lookup)
 	{
 		auto const n = full_size / constants::HASH_BYTES;
 		auto const w = constants::MIX_BYTES / constants::WORD_BYTES;
@@ -432,27 +864,127 @@ namespace egihash
 			cmix.push_back(fnv(fnv(fnv(mix[i], mix[i+1]), mix[i+2]), mix[i+3]));
 		}
 
-		::std::shared_ptr<decltype(s)> shared_mix(::std::make_shared<decltype(s)>(std::move(cmix)));
-		::std::map<::std::string, decltype(shared_mix)> out;
-		out.insert(decltype(out)::value_type(::std::string("mix digest"), shared_mix));
-		s.insert(s.end(), shared_mix->begin(), shared_mix->end());
-		out.insert(decltype(out)::value_type(::std::string("result"), ::std::make_shared<decltype(s)>(sha3_256(s))));
+		auto v = sha3_256(s);
+		result_t out;
+		::std::memcpy(&out.value.b[0], &v[0], ::std::min(sizeof(out.value.b), v.size()));
+		::std::memcpy(&out.mixhash.b[0], &cmix[0], ::std::min(sizeof(out.mixhash.b), cmix.size()));
 		return out;
+
+		//::std::shared_ptr<decltype(s)> shared_mix(::std::make_shared<decltype(s)>(std::move(cmix)));
+		//::std::map<::std::string, decltype(shared_mix)> out;
+		//out.insert(decltype(out)::value_type(::std::string("mix digest"), shared_mix));
+		//s.insert(s.end(), shared_mix->begin(), shared_mix->end());
+		//out.insert(decltype(out)::value_type(::std::string("result"), ::std::make_shared<decltype(s)>(sha3_256(s))));
+		//return out;
 	}
 
 	// TODO: unit tests / validation
-	decltype(auto) hashimoto_light(size_t const full_size, ::std::vector<sha3_512_t::deserialized_hash_t> const cache, sha3_256_t::deserialized_hash_t const & header, uint64_t const nonce)
+	result_t hashimoto_light(size_t const full_size, cache_t const & c, sha3_256_t::deserialized_hash_t const & header, uint64_t const nonce)
 	{
-		return hashimoto(header, nonce, full_size, [cache](size_t const x){return calc_dataset_item(cache, x);});
+		return hashimoto(header, nonce, full_size, [c](size_t const x){return dag_t::impl_t::calc_dataset_item(c.data(), x);});
 	}
 
 	// TODO: unit tests / validation
-	decltype(auto) hashimoto_full(size_t const full_size, ::std::vector<sha3_512_t::deserialized_hash_t> const dataset, sha3_256_t::deserialized_hash_t const & header, uint64_t const nonce)
+	result_t hashimoto_full(size_t const full_size, dag_t const & dataset, sha3_256_t::deserialized_hash_t const & header, uint64_t const nonce)
 	{
-		return hashimoto(header, nonce, full_size, [dataset](size_t const x){return dataset[x];});
+		return hashimoto(header, nonce, full_size, [dataset](size_t const x){return dataset.data()[x];});
+	}
+#endif // 0
+
+	// TODO: unify light & full implementation
+	namespace full
+	{
+		result_t hash(dag_t const & dag, void const * input_data, dag_t::size_type input_size)
+		{
+			auto const n = dag.size() / constants::HASH_BYTES;
+			static constexpr auto w = constants::MIX_BYTES / constants::WORD_BYTES;
+			static constexpr auto mixhashes = constants::MIX_BYTES / constants::HASH_BYTES;
+
+			sha3_256_t first_hash(input_data, input_size);
+
+			auto s = sha3_512(first_hash.deserialize());
+			decltype(s) mix;
+			for (size_t i = 0; i < (constants::MIX_BYTES / constants::HASH_BYTES); i++)
+			{
+				mix.insert(mix.end(), s.begin(), s.end());
+			}
+
+			for (size_t i = 0; i < constants::ACCESSES; i++)
+			{
+				auto p = fnv(i ^ s[0], mix[i % w]) % (n / mixhashes) * mixhashes;
+				decltype(s) newdata;
+				for (size_t j = 0; j < (constants::MIX_BYTES / constants::HASH_BYTES); j++)
+				{
+					auto const & h = dag.data()[p + j];
+					newdata.insert(newdata.end(), h.begin(), h.end());
+				}
+				for (auto j = mix.begin(), jEnd = mix.end(), k = newdata.begin(), kEnd = newdata.end(); j != jEnd && k != kEnd; j++, k++)
+				{
+					*j = fnv(*j, *k);
+				}
+			}
+
+			decltype(s) cmix;
+			for (size_t i = 0; i < mix.size(); i += 4)
+			{
+				cmix.push_back(fnv(fnv(fnv(mix[i], mix[i+1]), mix[i+2]), mix[i+3]));
+			}
+
+			auto v = sha3_256(s);
+			result_t out;
+			::std::memcpy(&out.value.b[0], &v[0], ::std::min(sizeof(out.value.b), v.size()));
+			::std::memcpy(&out.mixhash.b[0], &cmix[0], ::std::min(sizeof(out.mixhash.b), cmix.size()));
+			return out;
+		}
 	}
 
-	bool test_function()
+	namespace light
+	{
+		result_t hash(cache_t const & cache, void const * input_data, cache_t::size_type input_size)
+		{
+			auto const n = dag_t::get_full_size((cache.epoch() * constants::EPOCH_LENGTH) + 1) / constants::HASH_BYTES;
+			static constexpr auto w = constants::MIX_BYTES / constants::WORD_BYTES;
+			static constexpr auto mixhashes = constants::MIX_BYTES / constants::HASH_BYTES;
+
+			sha3_256_t first_hash(input_data, input_size);
+
+			auto s = sha3_512(first_hash.deserialize());
+			decltype(s) mix;
+			for (size_t i = 0; i < (constants::MIX_BYTES / constants::HASH_BYTES); i++)
+			{
+				mix.insert(mix.end(), s.begin(), s.end());
+			}
+
+			for (size_t i = 0; i < constants::ACCESSES; i++)
+			{
+				auto p = fnv(i ^ s[0], mix[i % w]) % (n / mixhashes) * mixhashes;
+				decltype(s) newdata;
+				for (size_t j = 0; j < (constants::MIX_BYTES / constants::HASH_BYTES); j++)
+				{
+					auto const & h = dag_t::impl_t::calc_dataset_item(cache.data(), p + j);
+					newdata.insert(newdata.end(), h.begin(), h.end());
+				}
+				for (auto j = mix.begin(), jEnd = mix.end(), k = newdata.begin(), kEnd = newdata.end(); j != jEnd && k != kEnd; j++, k++)
+				{
+					*j = fnv(*j, *k);
+				}
+			}
+
+			decltype(s) cmix;
+			for (size_t i = 0; i < mix.size(); i += 4)
+			{
+				cmix.push_back(fnv(fnv(fnv(mix[i], mix[i+1]), mix[i+2]), mix[i+3]));
+			}
+
+			auto v = sha3_256(s);
+			result_t out;
+			::std::memcpy(&out.value.b[0], &v[0], ::std::min(sizeof(out.value.b), v.size()));
+			::std::memcpy(&out.mixhash.b[0], &cmix[0], ::std::min(sizeof(out.mixhash.b), cmix.size()));
+			return out;
+		}
+	}
+
+	bool test_function_()
 	{
 		using namespace std;
 
@@ -464,8 +996,9 @@ namespace egihash
 		for (size_t i = 0; i < 10; i++)
 		{
 			input_str += base_str;
-			sixtyfour_results.push_back(make_unique<sha3_512_t>(input_str));
-			thirtytwo_results.push_back(make_unique<sha3_256_t>(input_str));
+			// TODO: make_unique requires c++14
+			//sixtyfour_results.push_back(make_unique<sha3_512_t>(input_str));
+			//thirtytwo_results.push_back(make_unique<sha3_256_t>(input_str));
 		}
 
 		// compare to known values
@@ -496,6 +1029,7 @@ namespace egihash
 		};
 
 		bool success = true;
+		#if 0 // don't do anything yet
 		for (size_t i = 0; i < sixtyfour_results.size(); i++)
 		{
 			if (string(*sixtyfour_results[i]) != sixtyfour_expected[i])
@@ -532,21 +1066,104 @@ namespace egihash
 		{
 			cout << dec << "all tests passed" << endl;
 		}
+		#endif
+
+		auto progress = [](::std::size_t step, ::std::size_t max, int phase) -> bool
+		{
+			switch(phase)
+			{
+				case cache_seeding:
+					cout << "\rSeeding cache...";
+					break;
+				case cache_generation:
+					cout << "\rGenerating cache...";
+					break;
+				case cache_saving:
+					cout << "\rSaving cache...";
+					break;
+				case cache_loading:
+					cout << "\rLoading cache...";
+					break;
+				case dag_generation:
+					cout << "\rGenerating DAG...";
+					break;
+				case dag_saving:
+					cout << "\rSaving DAG...";
+					break;
+				case dag_loading:
+					cout << "\rLoading DAG...";
+					break;
+				default:
+					break;
+			}
+			cout << fixed << setprecision(2)
+			<< static_cast<double>(step) / static_cast<double>(max) * 100.0 << "%"
+			<< setfill(' ') << setw(80) << flush;
+
+			return true;
+		};
+
+		{
+			dag_t generated(0, progress); // generate a DAG
+			cout << endl;
+			generated.save("epoch0_generated.dag", progress);
+			cout << endl;
+		}
+
+		// clear the global dag cache
+		dag_cache.clear();
+
+		{
+			dag_t loaded("epoch0_generated.dag", progress);
+			cout << endl;
+			loaded.save("epoch0_loaded.dag", progress);
+			cout << endl;
+		}
+
+
+		//dag_t d("epoch0_verified.dag", progress);
+		////cout << endl << "Saving DAG..." << endl;
+		//cout << endl;
+		//d.save("epoch0.dag", progress);
+		//cout << endl;
 
 		return success;
+	}
+
+	bool test_function() noexcept
+	{
+		using namespace std;
+		bool result = false;
+		try
+		{
+			result = test_function_();
+		}
+		catch (::std::exception const & e)
+		{
+			cerr << "[ERROR]: Caught exception: " << e.what() << endl;
+			result = false;
+		}
+		catch(...)
+		{
+			cerr << "[ERROR]: Unknown exception." << endl;
+			result = false;
+		}
+
+		return result;
 	}
 }
 
 extern "C"
 {
+	#if 0 // TODO: FIXME
 	struct EGIHASH_NAMESPACE(light)
 	{
 		unsigned int block_number;
-		::std::vector<sha3_512_t::deserialized_hash_t> cache;
+		::egihash::cache_t cache;
 
 		EGIHASH_NAMESPACE(light)(unsigned int block_number)
 		: block_number(block_number)
-		, cache(::egihash::mkcache(get_cache_size(block_number), ::egihash::get_seedhash(block_number)))
+		, cache(block_number, ::egihash::get_seedhash(block_number))
 		{
 
 		}
@@ -555,7 +1172,7 @@ extern "C"
 		{
 			// TODO: copy-free version
 			EGIHASH_NAMESPACE(result_t) result;
-			auto ret = ::egihash::hashimoto_light(get_full_size(block_number), cache, sha3_256_t(header_hash).deserialize(), nonce);
+			auto ret = ::egihash::hashimoto_light(get_full_size(block_number), cache.data(), sha3_256_t(header_hash).deserialize(), nonce);
 			auto const & val = ret["result"];
 			auto const & mix = ret["mix hash"];
 			::std::memcpy(result.value.b, &(*val)[0], sizeof(result.value.b));
@@ -571,8 +1188,9 @@ extern "C"
 
 		EGIHASH_NAMESPACE(full)(EGIHASH_NAMESPACE(light_t) light, EGIHASH_NAMESPACE(callback) callback)
 		: light(light)
-		, dataset(::egihash::calc_dataset(light->cache, get_full_size(light->block_number), callback))
+		, dataset()//TODO::egihash::calc_dataset(light->cache, get_full_size(light->block_number), callback))
 		{
+			(void)callback;//TODO
 		}
 
 		EGIHASH_NAMESPACE(result_t) compute(EGIHASH_NAMESPACE(h256_t) header_hash, uint64_t nonce)
@@ -684,4 +1302,19 @@ extern "C"
 			// no way to indicate error
 		}
 	}
+
+	void egihash_h256_compute(EGIHASH_NAMESPACE(h256_t) * output_hash, void * input_data, uint64_t input_size)
+	{
+		try
+		{
+			sha3_256_t hash(input_data, input_size);
+			::std::memcpy(output_hash->b, hash.data, hash.hash_size);
+		}
+		catch (...)
+		{
+			// zero hash data indicates error
+			::std::memset(output_hash->b, 0, 32);
+		}
+	}
+	#endif
 }
