@@ -456,7 +456,7 @@ namespace egihash
 		/** \brief Unload a DAG.
 		*
 		*	To actually free a DAG from memory, call this function on a DAG. The DAG will then be released from the internal cache.
-		*	Once all references to the DAG for this epoch are removed, it will be freed.
+		*	Once all references to the DAG for this epoch are destroyed, it will be freed.
 		*/
 		void unload() const;
 
