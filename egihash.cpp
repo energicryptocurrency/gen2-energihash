@@ -818,7 +818,7 @@ namespace egihash
 
 	void dag_t::unload() const
 	{
-		auto const & i = dag_cache.erase(epoch());
+		auto const i = dag_cache.erase(epoch());
 		if (i == 0)
 		{
 			throw hash_exception("Can not unload DAG - not loaded.");
