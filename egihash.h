@@ -453,6 +453,13 @@ namespace egihash
 		*/
 		cache_t get_cache() const;
 
+		/** \brief Unload a DAG.
+		*
+		*	To actually free a DAG from memory, call this function on a DAG. The DAG will then be released from the internal cache.
+		*	Once all references to the DAG for this epoch are removed, it will be freed.
+		*/
+		void unload() const;
+
 		/** \brief Get the size of the DAG data in bytes.
 		*
 		*	\param block_number is the block number for which DAG size to compute.
