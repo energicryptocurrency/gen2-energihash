@@ -817,6 +817,15 @@ namespace egihash
 		return impl->get_cache();
 	}
 
+	void dag_t::unload() const
+	{
+		auto const i = dag_cache.erase(epoch());
+		if (i == 0)
+		{
+			throw hash_exception("Can not unload DAG - not loaded.");
+		}
+	}
+
 	dag_t::size_type dag_t::get_full_size(uint64_t const block_number) noexcept
 	{
 		return impl_t::get_full_size(block_number);
@@ -1103,6 +1112,12 @@ namespace egihash
 
 			return true;
 		};
+
+		{
+			dag_t loaded("epoch0_generated.dag", progress);
+			cout << endl << "\runloading DAG: " << endl;
+			loaded.unload();
+		}
 
 		{
 			dag_t generated(0, progress); // generate a DAG
