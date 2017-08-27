@@ -181,6 +181,7 @@ namespace egihash
 		*
 		*	\param input_data A pointer to the start of the data to be hashed
 		*	\param input_size The number of bytes of input data to hash
+		*	\throws hash_exception on error
 		*/
 		h256_t(void const * input_data, size_type input_size);
 
