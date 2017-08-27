@@ -150,6 +150,9 @@ namespace egihash
 	*/
 	struct h256_t
 	{
+		using size_type = ::std::size_t;
+		static constexpr size_type hash_size = 32;
+
 		/** \brief Default constructor for h256_t fills data field b with 0 bytes
 		*/
 		constexpr h256_t(): b{0} {}
@@ -174,13 +177,20 @@ namespace egihash
 		*/
 		~h256_t() = default;
 
+		/** \brief Construct and compute a hash from a data source.
+		*
+		*	\param input_data A pointer to the start of the data to be hashed
+		*	\param input_size The number of bytes of input data to hash
+		*/
+		h256_t(void const * input_data, size_type input_size);
+
 		/** \brief Test if this hash is valid. Returns true if hash data is not all 0 bytes.
 		*/
 		operator bool() const;
 
 		/** \brief This member stores the 256-bit hash data
 		*/
-		uint8_t b[32];
+		uint8_t b[hash_size];
 	};
 
 	/** \brief A default constructed h256_t has all empty bytes.
