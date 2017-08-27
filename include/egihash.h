@@ -504,6 +504,16 @@ namespace egihash
 		{
 			return hash(dag, start_ptr, static_cast<dag_t::size_type>((end_ptr - start_ptr) * sizeof(start_ptr[0])));
 		}
+
+		/** \brief The full Egihash function to be used by full nodes and miners.
+		*
+		*	\param dag A const reference to the DAG for the current epoch
+		*	\param header_hash A h256_t (Keccak-256) hash of the truncated block header
+		*	\param nonce An unsigned 64-bit integer stored in little endian byte order
+		*	\throws hash_exception on error
+		*	\return result_t containing hashed data
+		*/
+		result_t hash(dag_t const & dag, h256_t const & header_hash, uint64_t const nonce);
 	}
 
 	namespace light
@@ -532,6 +542,16 @@ namespace egihash
 		{
 			return hash(cache, start_ptr, static_cast<cache_t::size_type>((end_ptr - start_ptr) * sizeof(start_ptr[0])));
 		}
+
+		/** \brief The full Egihash function to be used by full nodes and miners.
+		*
+		*	\param dag A const reference to the DAG for the current epoch
+		*	\param header_hash A h256_t (Keccak-256) hash of the truncated block header
+		*	\param nonce An unsigned 64-bit integer stored in little endian byte order
+		*	\throws hash_exception on error
+		*	\return result_t containing hashed data
+		*/
+		result_t hash(cache_t const & cache, h256_t const & header_hash, uint64_t const nonce);
 	}
 }
 
