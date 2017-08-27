@@ -554,7 +554,7 @@ namespace egihash
 			return hash(cache, start_ptr, static_cast<cache_t::size_type>((end_ptr - start_ptr) * sizeof(start_ptr[0])));
 		}
 
-		/** \brief The full Egihash function to be used by full nodes and miners.
+		/** \brief The light Egihash function to be used by light wallets & light verification clients.
 		*
 		*	\param dag A const reference to the DAG for the current epoch
 		*	\param header_hash A h256_t (Keccak-256) hash of the truncated block header
