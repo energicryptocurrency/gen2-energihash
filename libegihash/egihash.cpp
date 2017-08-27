@@ -321,11 +321,12 @@ namespace egihash
 	h256_t::h256_t(void const * input_data, size_type input_size)
 	: b{0}
 	{
-		if (::sha3_256(b, hash_size, reinterpret_cast<uint8_t const *>(input), input_size) != 0)
+		if (::sha3_256(b, hash_size, reinterpret_cast<uint8_t const *>(input_data), input_size) != 0)
 		{
 			throw hash_exception("Keccak-256 computation failed.");
 		}
 	}
+
 	h256_t::operator bool() const
 	{
 		return (::std::memcmp(&b[0], &empty_h256.b[0], sizeof(b)) != 0);
