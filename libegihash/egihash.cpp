@@ -290,10 +290,43 @@ namespace
 		auto const serialized = HashType::serialize(deserialized);
 		return hash_words<HashType>(serialized);
 	}
+
+	template <typename HashFunc, typename DatasetType>
+	result_t hash_header_nonce(HashFunc hashfunc, DatasetType const & dataset, h256_t const & header_hash, uint64_t const nonce)
+	{
+		uint8_t const * nonce_bytes = reinterpret_cast<uint8_t const *>(&nonce);
+
+		// combine header_hash with nonce
+		uint8_t const bytes[sizeof(header_hash.b) + sizeof(nonce)] =
+		{
+			header_hash.b[ 0], header_hash.b[ 1], header_hash.b[ 2], header_hash.b[ 3],
+			header_hash.b[ 4], header_hash.b[ 5], header_hash.b[ 6], header_hash.b[ 7],
+			header_hash.b[ 8], header_hash.b[ 9], header_hash.b[10], header_hash.b[11],
+			header_hash.b[12], header_hash.b[13], header_hash.b[14], header_hash.b[15],
+			header_hash.b[16], header_hash.b[17], header_hash.b[18], header_hash.b[19],
+			header_hash.b[20], header_hash.b[21], header_hash.b[22], header_hash.b[23],
+			header_hash.b[24], header_hash.b[25], header_hash.b[26], header_hash.b[27],
+			header_hash.b[28], header_hash.b[29], header_hash.b[30], header_hash.b[31],
+
+			nonce_bytes[0], nonce_bytes[1], nonce_bytes[2], nonce_bytes[3],
+			nonce_bytes[4], nonce_bytes[5], nonce_bytes[6], nonce_bytes[7],
+		};
+
+		return hashfunc(dataset, bytes, sizeof(bytes));
+	}
 }
 
 namespace egihash
 {
+	h256_t::h256_t(void const * input_data, size_type input_size)
+	: b{0}
+	{
+		if (::sha3_256(b, hash_size, reinterpret_cast<uint8_t const *>(input_data), input_size) != 0)
+		{
+			throw hash_exception("Keccak-256 computation failed.");
+		}
+	}
+
 	h256_t::operator bool() const
 	{
 		return (::std::memcmp(&b[0], &empty_h256.b[0], sizeof(b)) != 0);
@@ -946,6 +979,12 @@ namespace egihash
 			::std::memcpy(&out.mixhash.b[0], &cmix[0], ::std::min(sizeof(out.mixhash.b), cmix.size()));
 			return out;
 		}
+
+		result_t hash(dag_t const & dag, h256_t const & header_hash, uint64_t const nonce)
+		{
+			std::function<result_t (dag_t const &, void const *, dag_t::size_type)> hash_func = static_cast<result_t (*)(dag_t const &, void const *, dag_t::size_type)>(&hash);
+			return hash_header_nonce(hash_func, dag, header_hash, nonce);
+		}
 	}
 
 	namespace light
@@ -991,6 +1030,12 @@ namespace egihash
 			::std::memcpy(&out.value.b[0], &v[0], ::std::min(sizeof(out.value.b), v.size()));
 			::std::memcpy(&out.mixhash.b[0], &cmix[0], ::std::min(sizeof(out.mixhash.b), cmix.size()));
 			return out;
+		}
+
+		result_t hash(cache_t const & cache, h256_t const & header_hash, uint64_t const nonce)
+		{
+			std::function<result_t (cache_t const &, void const *, cache_t::size_type)> hash_func = static_cast<result_t (*)(cache_t const &, void const *, cache_t::size_type)>(&hash);
+			return hash_header_nonce(hash_func, cache, header_hash, nonce);
 		}
 	}
 
