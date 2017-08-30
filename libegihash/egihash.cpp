@@ -10,6 +10,7 @@ extern "C"
 
 #include <stdint.h>
 #include <algorithm>
+#include <atomic>
 #include <cmath>
 #include <cstring>
 #include <fstream>
@@ -673,9 +674,13 @@ namespace egihash
 	// construct on first use dag_cache_map ensures safe static initialization order
 	dag_t::impl_t::dag_cache_map & get_dag_cache()
 	{
-		std::lock_guard<std::mutex> lock(get_dag_cache_mutex());
-		static dag_t::impl_t::dag_cache_map dag_cache;
-		return dag_cache;
+		static std::atomic_bool initialized(false);
+		static std::unique_ptr<dag_t::impl_t::dag_cache_map> dag_cache;
+		if (!initialized.exchange(true))
+		{
+			dag_cache.reset(new dag_t::impl_t::dag_cache_map());
+		}
+		return *(dag_cache.get());
 	}
 	// ensures single threaded construction
 	dag_t::impl_t::dag_cache_map & dag_cache = get_dag_cache();
@@ -1174,10 +1179,15 @@ namespace egihash
 			return true;
 		};
 
+		try
 		{
 			dag_t loaded("epoch0_generated.dag", progress);
 			cout << endl << "\runloading DAG: " << endl;
 			loaded.unload();
+		}
+		catch (hash_exception const & e)
+		{
+			cout << endl << "[Exception]: (don't worry about this if you don't have epoch0_generated.dag): " << e.what() << endl;
 		}
 
 		{
