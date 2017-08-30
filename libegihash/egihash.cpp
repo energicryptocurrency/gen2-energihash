@@ -688,8 +688,8 @@ namespace egihash
 		// if we have the correct DAG already loaded, return it from the cache
 		{
 			lock_guard<mutex> lock(get_dag_cache_mutex());
-			auto const dag_cache_iterator = dag_cache.find(epoch_number);
-			if (dag_cache_iterator != dag_cache.end())
+			auto const dag_cache_iterator = get_dag_cache().find(epoch_number);
+			if (dag_cache_iterator != get_dag_cache().end())
 			{
 				return dag_cache_iterator->second;
 			}
@@ -700,7 +700,7 @@ namespace egihash
 		shared_ptr<dag_t::impl_t> impl(new dag_t::impl_t(block_number, callback));
 
 		lock_guard<mutex> lock(get_dag_cache_mutex());
-		auto insert_pair = dag_cache.insert(make_pair(epoch_number, impl));
+		auto insert_pair = get_dag_cache().insert(make_pair(epoch_number, impl));
 
 		// if insert succeded, return the dag
 		if (insert_pair.second)
@@ -709,8 +709,8 @@ namespace egihash
 		}
 
 		// if insert failed, it's probably already been inserted
-		auto const dag_cache_iterator = dag_cache.find(epoch_number);
-		if (dag_cache_iterator != dag_cache.end())
+		auto const dag_cache_iterator = get_dag_cache().find(epoch_number);
+		if (dag_cache_iterator != get_dag_cache().end())
 		{
 			return dag_cache_iterator->second;
 		}
@@ -799,8 +799,8 @@ namespace egihash
 		// if we have the correct DAG already loaded, return it from the cache
 		{
 			lock_guard<mutex> lock(get_dag_cache_mutex());
-			auto const dag_cache_iterator = dag_cache.find(header.epoch);
-			if (dag_cache_iterator != dag_cache.end())
+			auto const dag_cache_iterator = get_dag_cache().find(header.epoch);
+			if (dag_cache_iterator != get_dag_cache().end())
 			{
 				return dag_cache_iterator->second;
 			}
@@ -811,7 +811,7 @@ namespace egihash
 		shared_ptr<dag_t::impl_t> impl(new dag_t::impl_t(read, header, callback));
 
 		lock_guard<mutex> lock(get_dag_cache_mutex());
-		auto insert_pair = dag_cache.insert(make_pair(header.epoch, impl));
+		auto insert_pair = get_dag_cache().insert(make_pair(header.epoch, impl));
 
 		// if insert succeded, return the dag
 		if (insert_pair.second)
@@ -820,8 +820,8 @@ namespace egihash
 		}
 
 		// if insert failed, it's probably already been inserted
-		auto const dag_cache_iterator = dag_cache.find(header.epoch);
-		if (dag_cache_iterator != dag_cache.end())
+		auto const dag_cache_iterator = get_dag_cache().find(header.epoch);
+		if (dag_cache_iterator != get_dag_cache().end())
 		{
 			return dag_cache_iterator->second;
 		}
@@ -868,7 +868,7 @@ namespace egihash
 
 	void dag_t::unload() const
 	{
-		auto const i = dag_cache.erase(epoch());
+		auto const i = get_dag_cache().erase(epoch());
 		if (i == 0)
 		{
 			throw hash_exception("Can not unload DAG - not loaded.");
@@ -1188,7 +1188,7 @@ namespace egihash
 		}
 
 		// clear the global dag cache
-		dag_cache.clear();
+		get_dag_cache().clear();
 
 		{
 			dag_t loaded("epoch0_generated.dag", progress);
