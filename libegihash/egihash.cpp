@@ -1179,10 +1179,15 @@ namespace egihash
 			return true;
 		};
 
+		try
 		{
 			dag_t loaded("epoch0_generated.dag", progress);
 			cout << endl << "\runloading DAG: " << endl;
 			loaded.unload();
+		}
+		catch (hash_exception const & e)
+		{
+			cout << endl << "[Exception]: (don't worry about this if you don't have epoch0_generated.dag): " << e.what() << endl;
 		}
 
 		{
