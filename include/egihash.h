@@ -137,7 +137,8 @@ namespace egihash
 	*/
 	// TODO: randomized seedhash not zero seedhash
 	static constexpr char epoch0_seedhash[] = "\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00";
-	static_assert(sizeof(epoch0_seedhash) == 33, "Invalid seedhash");
+	static constexpr uint8_t size_epoch0_seedhash = sizeof(epoch0_seedhash) - 1;
+	static_assert(size_epoch0_seedhash == 32, "Invalid seedhash");
 
 	/** \brief get_seedhash(uint64_t) will compute the seedhash for a given block number.
 	*
@@ -282,11 +283,11 @@ namespace egihash
 	{
 		/** \brief size_type represents sizes used by a cache.
 		*/
-		using size_type = ::std::size_t;
+		using size_type = uint64_t;
 
 		/** \brief data_type is the underlying data store which stores a cache.
 		*/
-		using data_type = ::std::vector<::std::vector<int32_t>>;
+		using data_type = ::std::vector<::std::vector<uint32_t>>;
 
 		/** \brief default copy constructor.
 		*/
@@ -390,7 +391,7 @@ namespace egihash
 
 		/** \brief data_type is the underlying data store which stores a cache.
 		*/
-		using data_type = ::std::vector<::std::vector<int32_t>>;
+		using data_type = ::std::vector<::std::vector<uint32_t>>;
 
 		/** \brief default copy constructor.
 		*/

@@ -101,16 +101,16 @@ namespace
 	static_assert(dag_file_header_t::magic_size == 12, "Magic size invalid.");
 	static_assert(sizeof(dag_file_header_t) == 64, "Dag header size invalid.");
 
-	inline int32_t decode_int(uint8_t const * data, uint8_t const * dataEnd) noexcept
+	inline uint32_t decode_int(uint8_t const * data, uint8_t const * dataEnd) noexcept
 	{
 		if (!data || (dataEnd < (data + 3)))
 			return 0;
 
-		return static_cast<int32_t>(
-			(static_cast<int32_t>(data[0]) << 24) |
-			(static_cast<int32_t>(data[1]) << 16) |
-			(static_cast<int32_t>(data[2]) << 8) |
-			(static_cast<int32_t>(data[3]))
+		return static_cast<uint32_t>(
+			(static_cast<uint32_t>(data[3]) << 24) |
+			(static_cast<uint32_t>(data[2]) << 16) |
+			(static_cast<uint32_t>(data[1]) << 8) |
+			(static_cast<uint32_t>(data[0]))
 		);
 	}
 
@@ -136,9 +136,9 @@ namespace
 
 		string ret;
 		ss.str(string());
-		for (size_t i = 0; i < encoded.size(); i += 2)
+		for (size_t i = encoded.size(); i >= 2; i -= 2)
 		{
-			ret += static_cast<char>(stoi(encoded.substr(i, 2), 0, 16));
+			ret += static_cast<char>(stoi(encoded.substr(i - 2, 2), 0, 16));
 		}
 
 		return ret;
@@ -166,7 +166,7 @@ namespace
 	template <size_t HashSize, int (*HashFunction)(uint8_t *, size_t, uint8_t const * in, size_t)>
 	struct sha3_base
 	{
-		using deserialized_hash_t = ::std::vector<int32_t>;
+		using deserialized_hash_t = ::std::vector<uint32_t>;
 
 		static constexpr size_t hash_size = HashSize;
 		uint8_t data[hash_size];
@@ -195,7 +195,7 @@ namespace
 			compute_hash(input, input_size);
 		}
 
-		void compute_hash(void const * input, size_t const input_size)
+		inline void compute_hash(void const * input, size_t const input_size)
 		{
 			if (HashFunction(data, hash_size, reinterpret_cast<uint8_t const *>(input), input_size) != 0)
 			{
@@ -238,7 +238,7 @@ namespace
 
 	struct sha3_256_t : public sha3_base<32, ::sha3_256>
 	{
-		using deserialized_hash_t = ::std::vector<int32_t>;
+		using deserialized_hash_t = ::std::vector<uint32_t>;
 
 		sha3_256_t(::std::string const & input)
 		: sha3_base(input)
@@ -261,7 +261,7 @@ namespace
 
 	struct sha3_512_t : public sha3_base<64, ::sha3_512>
 	{
-		using deserialized_hash_t = ::std::vector<int32_t>;
+		using deserialized_hash_t = ::std::vector<uint32_t>;
 
 		sha3_512_t(::std::string const & input)
 		: sha3_base(input)
@@ -374,7 +374,7 @@ namespace egihash
 	// TODO: unit tests / validation
 	::std::string get_seedhash(uint64_t const block_number)
 	{
-		::std::string s(epoch0_seedhash);
+		::std::string s(epoch0_seedhash, size_epoch0_seedhash);
 		for (size_t i = 0; i < (block_number / constants::EPOCH_LENGTH); i++)
 		{
 			s = sha3_256_t::serialize(sha3_256(s));
@@ -385,7 +385,7 @@ namespace egihash
 	struct cache_t::impl_t
 	{
 		using size_type = cache_t::size_type;
-		using data_type = ::std::vector<::std::vector<int32_t>>;
+		using data_type = ::std::vector<::std::vector<uint32_t>>;
 
 		impl_t(uint64_t const block_number, ::std::string const & seed, progress_callback_type callback)
 		: epoch(block_number / constants::EPOCH_LENGTH)
@@ -405,11 +405,11 @@ namespace egihash
 
 		void mkcache(::std::string const & seed, progress_callback_type callback)
 		{
-			size_t n = size / constants::HASH_BYTES;
+			uint32_t n = size / constants::HASH_BYTES;
 
 			data.reserve(n);
 			data.push_back(sha3_512(seed));
-			for (size_t i = 1; i < n; i++)
+			for (uint32_t i = 1; i < n; i++)
 			{
 				data.push_back(sha3_512(data.back()));
 				if (((i % constants::CALLBACK_FREQUENCY) == 0) && !callback(i, n, cache_seeding))
@@ -418,20 +418,23 @@ namespace egihash
 				}
 			}
 
-			size_t progress_counter = 0;
-			for (size_t i = 0; i < constants::CACHE_ROUNDS; i++)
+			//std::cout << "Length: " << data.size() << std::endl;
+
+			uint32_t progress_counter = 0;
+			for (uint32_t i = 0; i < constants::CACHE_ROUNDS; i++)
 			{
-				for (size_t j = 0; j < n; j++)
+				for (uint32_t j = 0; j < n; j++)
 				{
 					auto v = data[j][0] % n;
-					auto & u = data[(j-1+n)%n];
+					auto u = data[(n - 1 + j)%n];
 					size_t count = 0;
 					for (auto & k : u)
 					{
 						k = k ^ data[v][count++];
 					}
-					data[i] = sha3_512(u);
-					if (((i % constants::CALLBACK_FREQUENCY) == 0) && !callback(progress_counter++, n * constants::CACHE_ROUNDS, cache_generation))
+					data[j] = sha3_512(u);
+
+					if (((++progress_counter % constants::CALLBACK_FREQUENCY) == 0) && !callback(progress_counter, n * constants::CACHE_ROUNDS, cache_generation))
 					{
 						throw hash_exception("Cache creation cancelled.");
 					}
@@ -511,7 +514,7 @@ namespace egihash
 	struct dag_t::impl_t
 	{
 		using size_type = dag_t::size_type;
-		using data_type = ::std::vector<::std::vector<int32_t>>;
+		using data_type = ::std::vector<::std::vector<uint32_t>>;
 		using dag_cache_map = ::std::map<uint64_t /* epoch */, ::std::shared_ptr<impl_t>>;
 		static constexpr uint64_t max_epoch = ::std::numeric_limits<uint64_t>::max();
 
@@ -605,9 +608,9 @@ namespace egihash
 
 		void generate(progress_callback_type callback)
 		{
-			size_type const n = size / constants::HASH_BYTES;
+			uint32_t const n = size / constants::HASH_BYTES;
 			data.reserve(n);
-			for (size_type i = 0; i < n; i++)
+			for (uint32_t i = 0; i < n; i++)
 			{
 				data.push_back(calc_dataset_item(cache.data(), i));
 				if ((i % constants::CALLBACK_FREQUENCY) == 0 && !callback(i, n, dag_generation))
@@ -617,22 +620,22 @@ namespace egihash
 			}
 		}
 
-		static data_type::value_type calc_dataset_item(::std::vector<sha3_512_t::deserialized_hash_t> const & cache, size_type const i)
+		static data_type::value_type calc_dataset_item(::std::vector<sha3_512_t::deserialized_hash_t> const & cache, uint32_t const i)
 		{
-			size_type const n = cache.size();
-			constexpr size_type r = constants::HASH_BYTES / constants::WORD_BYTES;
+			uint32_t const n = cache.size();
+			constexpr uint32_t r = constants::HASH_BYTES / constants::WORD_BYTES;
 			sha3_512_t::deserialized_hash_t mix(cache[i%n]);
 			mix[0] ^= i;
 			mix = sha3_512(mix);
-			for (size_type j = 0; j < constants::DATASET_PARENTS; j++)
+			for (uint32_t j = 0; j < constants::DATASET_PARENTS; j++)
 			{
-				size_type const cache_index = fnv(i ^ j, mix[j % r]);
-				auto l = cache[cache_index % n].begin();
+				uint32_t const cache_index = fnv(i ^ j, mix[j % r]);
+				auto lBeg = cache[cache_index % n].begin();
 				auto lEnd = cache[cache_index % n].end();
 				for (auto k = mix.begin(), kEnd = mix.end();
-					((k != kEnd) && (l != lEnd)); k++, l++)
+					((k != kEnd) && (lBeg != lEnd)); k++, lBeg++)
 				{
-					*k = fnv(*k, *l);
+					*k = fnv(*k, *lBeg);
 				}
 
 			}
@@ -663,24 +666,20 @@ namespace egihash
 	};
 
 	// construct on first use mutex ensures safe static initialization order
-	std::mutex & get_dag_cache_mutex()
+	std::recursive_mutex & get_dag_cache_mutex()
 	{
-		static std::mutex mutex;
+		static std::recursive_mutex mutex;
 		return mutex;
 	}
 	// ensures single threaded construction
-	std::mutex & dag_cache_mutex = get_dag_cache_mutex();
+	std::recursive_mutex & dag_cache_mutex = get_dag_cache_mutex();
 
 	// construct on first use dag_cache_map ensures safe static initialization order
 	dag_t::impl_t::dag_cache_map & get_dag_cache()
 	{
-		static std::atomic_bool initialized(false);
-		static std::unique_ptr<dag_t::impl_t::dag_cache_map> dag_cache;
-		if (!initialized.exchange(true))
-		{
-			dag_cache.reset(new dag_t::impl_t::dag_cache_map());
-		}
-		return *(dag_cache.get());
+		std::lock_guard<std::recursive_mutex> lock(get_dag_cache_mutex());
+		static dag_t::impl_t::dag_cache_map dag_cache;
+		return dag_cache;
 	}
 	// ensures single threaded construction
 	dag_t::impl_t::dag_cache_map & dag_cache = get_dag_cache();
@@ -692,7 +691,7 @@ namespace egihash
 
 		// if we have the correct DAG already loaded, return it from the cache
 		{
-			lock_guard<mutex> lock(get_dag_cache_mutex());
+			lock_guard<std::recursive_mutex> lock(get_dag_cache_mutex());
 			auto const dag_cache_iterator = get_dag_cache().find(epoch_number);
 			if (dag_cache_iterator != get_dag_cache().end())
 			{
@@ -704,7 +703,7 @@ namespace egihash
 		// this is not locked as it can be a lengthy process and we don't want to block access to the dag cache
 		shared_ptr<dag_t::impl_t> impl(new dag_t::impl_t(block_number, callback));
 
-		lock_guard<mutex> lock(get_dag_cache_mutex());
+		lock_guard<std::recursive_mutex> lock(get_dag_cache_mutex());
 		auto insert_pair = get_dag_cache().insert(make_pair(epoch_number, impl));
 
 		// if insert succeded, return the dag
@@ -803,7 +802,7 @@ namespace egihash
 
 		// if we have the correct DAG already loaded, return it from the cache
 		{
-			lock_guard<mutex> lock(get_dag_cache_mutex());
+			lock_guard<std::recursive_mutex> lock(get_dag_cache_mutex());
 			auto const dag_cache_iterator = get_dag_cache().find(header.epoch);
 			if (dag_cache_iterator != get_dag_cache().end())
 			{
@@ -815,7 +814,7 @@ namespace egihash
 		// this is not locked as it can be a lengthy process and we don't want to block access to the dag cache
 		shared_ptr<dag_t::impl_t> impl(new dag_t::impl_t(read, header, callback));
 
-		lock_guard<mutex> lock(get_dag_cache_mutex());
+		lock_guard<std::recursive_mutex> lock(get_dag_cache_mutex());
 		auto insert_pair = get_dag_cache().insert(make_pair(header.epoch, impl));
 
 		// if insert succeded, return the dag
@@ -1136,7 +1135,7 @@ namespace egihash
 		cout << endl;
 
 		cout << "encode_int(41) == " << encode_int(41) << endl;
-		vector<int32_t> v = {0x41, 0x42};
+		vector<uint32_t> v = {0x41, 0x42};
 		cout << "serialize_hash({41, 42}) == " << sha3_512_t::serialize(v) << endl;
 		if (success)
 		{
