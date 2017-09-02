@@ -107,4 +107,7 @@ BOOST_AUTO_TEST_CASE(SHA3512) {
 	test_hash_func<HashTrait512>();
 }
 
+BOOST_AUTO_TEST_CASE(dag_creation) {
+	BOOST_REQUIRE_MESSAGE(::egihash::test_function(), "test function failed");
+}
 

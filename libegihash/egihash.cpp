@@ -10,6 +10,7 @@ extern "C"
 
 #include <stdint.h>
 #include <algorithm>
+#include <atomic>
 #include <cmath>
 #include <cstring>
 #include <fstream>
@@ -290,10 +291,43 @@ namespace
 		auto const serialized = HashType::serialize(deserialized);
 		return hash_words<HashType>(serialized);
 	}
+
+	template <typename HashFunc, typename DatasetType>
+	result_t hash_header_nonce(HashFunc hashfunc, DatasetType const & dataset, h256_t const & header_hash, uint64_t const nonce)
+	{
+		uint8_t const * nonce_bytes = reinterpret_cast<uint8_t const *>(&nonce);
+
+		// combine header_hash with nonce
+		uint8_t const bytes[sizeof(header_hash.b) + sizeof(nonce)] =
+		{
+			header_hash.b[ 0], header_hash.b[ 1], header_hash.b[ 2], header_hash.b[ 3],
+			header_hash.b[ 4], header_hash.b[ 5], header_hash.b[ 6], header_hash.b[ 7],
+			header_hash.b[ 8], header_hash.b[ 9], header_hash.b[10], header_hash.b[11],
+			header_hash.b[12], header_hash.b[13], header_hash.b[14], header_hash.b[15],
+			header_hash.b[16], header_hash.b[17], header_hash.b[18], header_hash.b[19],
+			header_hash.b[20], header_hash.b[21], header_hash.b[22], header_hash.b[23],
+			header_hash.b[24], header_hash.b[25], header_hash.b[26], header_hash.b[27],
+			header_hash.b[28], header_hash.b[29], header_hash.b[30], header_hash.b[31],
+
+			nonce_bytes[0], nonce_bytes[1], nonce_bytes[2], nonce_bytes[3],
+			nonce_bytes[4], nonce_bytes[5], nonce_bytes[6], nonce_bytes[7],
+		};
+
+		return hashfunc(dataset, bytes, sizeof(bytes));
+	}
 }
 
 namespace egihash
 {
+	h256_t::h256_t(void const * input_data, size_type input_size)
+	: b{0}
+	{
+		if (::sha3_256(b, hash_size, reinterpret_cast<uint8_t const *>(input_data), input_size) != 0)
+		{
+			throw hash_exception("Keccak-256 computation failed.");
+		}
+	}
+
 	h256_t::operator bool() const
 	{
 		return (::std::memcmp(&b[0], &empty_h256.b[0], sizeof(b)) != 0);
@@ -628,8 +662,28 @@ namespace egihash
 		data_type data;
 	};
 
-	static dag_t::impl_t::dag_cache_map dag_cache;
-	static ::std::mutex dag_cache_mutex;
+	// construct on first use mutex ensures safe static initialization order
+	std::mutex & get_dag_cache_mutex()
+	{
+		static std::mutex mutex;
+		return mutex;
+	}
+	// ensures single threaded construction
+	std::mutex & dag_cache_mutex = get_dag_cache_mutex();
+
+	// construct on first use dag_cache_map ensures safe static initialization order
+	dag_t::impl_t::dag_cache_map & get_dag_cache()
+	{
+		static std::atomic_bool initialized(false);
+		static std::unique_ptr<dag_t::impl_t::dag_cache_map> dag_cache;
+		if (!initialized.exchange(true))
+		{
+			dag_cache.reset(new dag_t::impl_t::dag_cache_map());
+		}
+		return *(dag_cache.get());
+	}
+	// ensures single threaded construction
+	dag_t::impl_t::dag_cache_map & dag_cache = get_dag_cache();
 
 	::std::shared_ptr<dag_t::impl_t> get_dag(uint64_t block_number, progress_callback_type callback)
 	{
@@ -638,9 +692,9 @@ namespace egihash
 
 		// if we have the correct DAG already loaded, return it from the cache
 		{
-			lock_guard<mutex> lock(dag_cache_mutex);
-			auto const dag_cache_iterator = dag_cache.find(epoch_number);
-			if (dag_cache_iterator != dag_cache.end())
+			lock_guard<mutex> lock(get_dag_cache_mutex());
+			auto const dag_cache_iterator = get_dag_cache().find(epoch_number);
+			if (dag_cache_iterator != get_dag_cache().end())
 			{
 				return dag_cache_iterator->second;
 			}
@@ -650,8 +704,8 @@ namespace egihash
 		// this is not locked as it can be a lengthy process and we don't want to block access to the dag cache
 		shared_ptr<dag_t::impl_t> impl(new dag_t::impl_t(block_number, callback));
 
-		lock_guard<mutex> lock(dag_cache_mutex);
-		auto insert_pair = dag_cache.insert(make_pair(epoch_number, impl));
+		lock_guard<mutex> lock(get_dag_cache_mutex());
+		auto insert_pair = get_dag_cache().insert(make_pair(epoch_number, impl));
 
 		// if insert succeded, return the dag
 		if (insert_pair.second)
@@ -660,8 +714,8 @@ namespace egihash
 		}
 
 		// if insert failed, it's probably already been inserted
-		auto const dag_cache_iterator = dag_cache.find(epoch_number);
-		if (dag_cache_iterator != dag_cache.end())
+		auto const dag_cache_iterator = get_dag_cache().find(epoch_number);
+		if (dag_cache_iterator != get_dag_cache().end())
 		{
 			return dag_cache_iterator->second;
 		}
@@ -749,9 +803,9 @@ namespace egihash
 
 		// if we have the correct DAG already loaded, return it from the cache
 		{
-			lock_guard<mutex> lock(dag_cache_mutex);
-			auto const dag_cache_iterator = dag_cache.find(header.epoch);
-			if (dag_cache_iterator != dag_cache.end())
+			lock_guard<mutex> lock(get_dag_cache_mutex());
+			auto const dag_cache_iterator = get_dag_cache().find(header.epoch);
+			if (dag_cache_iterator != get_dag_cache().end())
 			{
 				return dag_cache_iterator->second;
 			}
@@ -761,8 +815,8 @@ namespace egihash
 		// this is not locked as it can be a lengthy process and we don't want to block access to the dag cache
 		shared_ptr<dag_t::impl_t> impl(new dag_t::impl_t(read, header, callback));
 
-		lock_guard<mutex> lock(dag_cache_mutex);
-		auto insert_pair = dag_cache.insert(make_pair(header.epoch, impl));
+		lock_guard<mutex> lock(get_dag_cache_mutex());
+		auto insert_pair = get_dag_cache().insert(make_pair(header.epoch, impl));
 
 		// if insert succeded, return the dag
 		if (insert_pair.second)
@@ -771,8 +825,8 @@ namespace egihash
 		}
 
 		// if insert failed, it's probably already been inserted
-		auto const dag_cache_iterator = dag_cache.find(header.epoch);
-		if (dag_cache_iterator != dag_cache.end())
+		auto const dag_cache_iterator = get_dag_cache().find(header.epoch);
+		if (dag_cache_iterator != get_dag_cache().end())
 		{
 			return dag_cache_iterator->second;
 		}
@@ -819,7 +873,7 @@ namespace egihash
 
 	void dag_t::unload() const
 	{
-		auto const i = dag_cache.erase(epoch());
+		auto const i = get_dag_cache().erase(epoch());
 		if (i == 0)
 		{
 			throw hash_exception("Can not unload DAG - not loaded.");
@@ -946,6 +1000,12 @@ namespace egihash
 			::std::memcpy(&out.mixhash.b[0], &cmix[0], ::std::min(sizeof(out.mixhash.b), cmix.size()));
 			return out;
 		}
+
+		result_t hash(dag_t const & dag, h256_t const & header_hash, uint64_t const nonce)
+		{
+			std::function<result_t (dag_t const &, void const *, dag_t::size_type)> hash_func = static_cast<result_t (*)(dag_t const &, void const *, dag_t::size_type)>(&hash);
+			return hash_header_nonce(hash_func, dag, header_hash, nonce);
+		}
 	}
 
 	namespace light
@@ -991,6 +1051,12 @@ namespace egihash
 			::std::memcpy(&out.value.b[0], &v[0], ::std::min(sizeof(out.value.b), v.size()));
 			::std::memcpy(&out.mixhash.b[0], &cmix[0], ::std::min(sizeof(out.mixhash.b), cmix.size()));
 			return out;
+		}
+
+		result_t hash(cache_t const & cache, h256_t const & header_hash, uint64_t const nonce)
+		{
+			std::function<result_t (cache_t const &, void const *, cache_t::size_type)> hash_func = static_cast<result_t (*)(cache_t const &, void const *, cache_t::size_type)>(&hash);
+			return hash_header_nonce(hash_func, cache, header_hash, nonce);
 		}
 	}
 
@@ -1113,10 +1179,15 @@ namespace egihash
 			return true;
 		};
 
+		try
 		{
 			dag_t loaded("epoch0_generated.dag", progress);
 			cout << endl << "\runloading DAG: " << endl;
 			loaded.unload();
+		}
+		catch (hash_exception const & e)
+		{
+			cout << endl << "[Exception]: (don't worry about this if you don't have epoch0_generated.dag): " << e.what() << endl;
 		}
 
 		{
@@ -1127,7 +1198,7 @@ namespace egihash
 		}
 
 		// clear the global dag cache
-		dag_cache.clear();
+		get_dag_cache().clear();
 
 		{
 			dag_t loaded("epoch0_generated.dag", progress);
