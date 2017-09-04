@@ -13,6 +13,7 @@
 #include <stdexcept>
 #include <type_traits>
 #include <vector>
+#include <cstring>
 
 namespace egihash
 {
@@ -104,6 +105,27 @@ namespace egihash
 		//static constexpr EGIHASH_NAMESPACE(h256_t) empty_h256 = {{0}};
 		//static constexpr EGIHASH_NAMESPACE(result_t) empty_result = {{{0}}, {{0}}};
 	}
+
+	/** \brief node union is used instead of the native integer to allow both bytes level access and as a 4 byte hash word
+	*
+	*/
+	union node
+	{
+		uint32_t hword;
+		uint8_t  bytes[4];
+		node()
+		:hword{}
+		{}
+
+		node(uint8_t bytes_[4])
+		{
+			::memcpy(bytes, bytes_, 4);
+		}
+
+		node(uint32_t hword_):hword(hword_)
+		{}
+	};
+
 
 	/** \brief hash_exception indicates an error or cancellation when performing a task within egihash.
 	*
@@ -287,7 +309,7 @@ namespace egihash
 
 		/** \brief data_type is the underlying data store which stores a cache.
 		*/
-		using data_type = ::std::vector<::std::vector<uint32_t>>;
+		using data_type = ::std::vector<::std::vector<node>>;
 
 		/** \brief default copy constructor.
 		*/
@@ -391,7 +413,7 @@ namespace egihash
 
 		/** \brief data_type is the underlying data store which stores a cache.
 		*/
-		using data_type = ::std::vector<::std::vector<uint32_t>>;
+		using data_type = ::std::vector<::std::vector<node>>;
 
 		/** \brief default copy constructor.
 		*/
