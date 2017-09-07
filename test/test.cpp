@@ -109,6 +109,72 @@ BOOST_AUTO_TEST_CASE(SHA3512) {
 	test_hash_func<HashTrait512>();
 }
 
+BOOST_AUTO_TEST_CASE(EGIHASH_FULL)
+{
+	using namespace std;
+	using namespace egihash;
+
+	auto progress = [](::std::size_t step, ::std::size_t max, int phase) -> bool
+	{
+		switch(phase)
+		{
+			case cache_seeding:
+				cout << "\rSeeding cache...";
+				break;
+			case cache_generation:
+				cout << "\rGenerating cache...";
+				break;
+			case cache_saving:
+				cout << "\rSaving cache...";
+				break;
+			case cache_loading:
+				cout << "\rLoading cache...";
+				break;
+			case dag_generation:
+				cout << "\rGenerating DAG...";
+				break;
+			case dag_saving:
+				cout << "\rSaving DAG...";
+				break;
+			case dag_loading:
+				cout << "\rLoading DAG...";
+				break;
+			default:
+				break;
+		}
+		cout << fixed << setprecision(2)
+		<< static_cast<double>(step) / static_cast<double>(max) * 100.0 << "%"
+		<< setfill(' ') << setw(80) << flush;
+
+		return true;
+	};
+
+	BOOST_REQUIRE_MESSAGE(boost::filesystem::exists( "data/egihash.dag" ), "data/egihash.dag does not exist yet!");
+	dag_t d("data/egihash.dag", progress);
+	cout << endl;
+
+	string rawdata("this is a test string to be hashed");
+	string const expected_value("TODO: put the actual expected hash here from ethash");
+	string const expected_mixhash("TODO: put the actual expected mixhash here from ethash");
+
+	{
+		auto const h = full::hash(d, rawdata.c_str(), rawdata.size());
+		auto const value_str = toHex(h.value.b, h.value.hash_size);
+		auto const mix_str = toHex(h.mixhash.b, h.mixhash.hash_size);
+		BOOST_CHECK_MESSAGE(value_str == expected_value, "\nactual=" << value_str << "\nexpected=" << expected_value);
+		BOOST_CHECK_MESSAGE(mix_str == expected_mixhash, "\nactual=" << mix_str << "\nexpected=" << expected_mixhash);
+	}
+
+	{
+		auto const h = light::hash(d.get_cache(), rawdata.c_str(), rawdata.size());
+		auto const value_str = toHex(h.value.b, h.value.hash_size);
+		auto const mix_str = toHex(h.mixhash.b, h.mixhash.hash_size);
+		BOOST_CHECK_MESSAGE(value_str == expected_value, "\nactual=" << value_str << "\nexpected=" << expected_value);
+		BOOST_CHECK_MESSAGE(mix_str == expected_mixhash, "\nactual=" << mix_str << "\nexpected=" << expected_mixhash);
+	}
+	d.unload();
+}
+
 BOOST_AUTO_TEST_CASE(FULL_CLIENT)
 {
 	string filename_egi = string("egihash.dag");
