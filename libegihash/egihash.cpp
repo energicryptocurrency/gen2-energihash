@@ -375,6 +375,17 @@ namespace egihash
 	::std::string get_seedhash(uint64_t const block_number)
 	{
 		::std::string s(epoch0_seedhash, size_epoch0_seedhash);
+		// convert seedhash to hex
+		{
+			// TODO: fast hex conversion
+			::std::stringstream ss;
+			ss << ::std::hex;
+			for (auto const i : s)
+			{
+				ss << ::std::setw(2) << ::std::setfill('0') << static_cast<uint16_t>(i);
+			}
+			s = ss.str();
+		}
 		for (size_t i = 0; i < (block_number / constants::EPOCH_LENGTH); i++)
 		{
 			s = sha3_256_t::serialize(sha3_256(s));
