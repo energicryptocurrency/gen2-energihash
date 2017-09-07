@@ -109,6 +109,7 @@ namespace egihash
 	/** \brief node union is used instead of the native integer to allow both bytes level access and as a 4 byte hash word
 	*
 	*/
+	#pragma pack(push, 1)
 	union node
 	{
 		uint32_t hword;
@@ -125,6 +126,8 @@ namespace egihash
 		node(uint32_t hword_):hword(hword_)
 		{}
 	};
+	#pragma pack(pop)
+	static_assert(sizeof(node) == sizeof(uint32_t), "Invalid hash node size");
 
 
 	/** \brief hash_exception indicates an error or cancellation when performing a task within egihash.
