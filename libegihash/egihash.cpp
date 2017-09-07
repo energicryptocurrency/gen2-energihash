@@ -234,7 +234,7 @@ namespace
 			uint8_t const * iEnd = reinterpret_cast<uint8_t const *>(&data.back());
 			for (uint8_t const * i = reinterpret_cast<uint8_t const *>(data.data()); i != iEnd; i++)
 			{
-				ss << ::std::setw(2) << ::std::setfill('0') << static_cast<uint16_t>(i);
+				ss << ::std::setw(2) << ::std::setfill('0') << static_cast<uint16_t>(*i);
 			}
 			return ss.str();
 		}
