@@ -206,12 +206,24 @@ namespace
 
 		deserialized_hash_t deserialize() const
 		{
-			return data;
+			deserialized_hash_t out(hash_size / 4, node());
+			size_t j = 0;
+			for (auto const & i : data)
+			//for (size_t i = 0, j = 0; i < hash_size; i += constants::WORD_BYTES, j++)
+			{
+				out[j++] = decode_int(&i.bytes[0], &i.bytes[3]);
+			}
+			return out;
 		}
 
 		static ::std::string serialize(deserialized_hash_t const & h)
 		{
-			return std::string(reinterpret_cast<const char*>(h.data()), hash_size);
+			::std::string ret;
+			for (auto const i : h)
+			{
+				ret += zpad(encode_int(i.hword), 4);
+			}
+			return ret;
 		}
 
 		operator ::std::string() const
@@ -219,9 +231,10 @@ namespace
 			// TODO: fast hex conversion
 			::std::stringstream ss;
 			ss << ::std::hex;
-			for (auto const i : data)
+			uint8_t const * iEnd = reinterpret_cast<uint8_t const *>(&data.back());
+			for (uint8_t const * i = reinterpret_cast<uint8_t const *>(data.data()); i != iEnd; i++)
 			{
-				ss << ::std::setw(2) << ::std::setfill('0') << i.hword;
+				ss << ::std::setw(2) << ::std::setfill('0') << static_cast<uint16_t>(i);
 			}
 			return ss.str();
 		}
@@ -267,7 +280,8 @@ namespace
 	template <typename HashType>
 	typename HashType::deserialized_hash_t hash_words(::std::string const & data)
 	{
-		return HashType(data).data;
+		auto const hash = HashType(data);
+		return hash.deserialize();
 	}
 
 	// TODO: unit tests / validation
