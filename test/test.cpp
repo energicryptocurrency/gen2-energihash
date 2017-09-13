@@ -30,6 +30,7 @@
 #include <fstream>
 #include <vector>
 #include <memory>
+#include <tuple>
 #include <random>
 #include <boost/filesystem.hpp>
 #include <boost/test/unit_test.hpp>
@@ -109,7 +110,8 @@ BOOST_AUTO_TEST_CASE(SHA3512) {
 	test_hash_func<HashTrait512>();
 }
 
-BOOST_AUTO_TEST_CASE(EGIHASH_FULL)
+
+BOOST_AUTO_TEST_CASE(EGIHASH_HASHIMOTO)
 {
 	using namespace std;
 	using namespace egihash;
@@ -149,31 +151,38 @@ BOOST_AUTO_TEST_CASE(EGIHASH_FULL)
 		return true;
 	};
 
-	BOOST_REQUIRE_MESSAGE(boost::filesystem::exists( "data/egihash.dag" ), "data/egihash.dag does not exist yet!");
+	if (!boost::filesystem::exists( "data/egihash.dag" ))
+	{
+		std::cout << "data/egihash.dag does not exist yet! will be auto generated" << std::endl;
+		egihash::dag_t dag(0, progress);
+		dag.save("data/egihash.dag");
+	}
+
 	dag_t d("data/egihash.dag", progress);
 	cout << endl;
 
 	string rawdata("this is a test string to be hashed");
-	string const expected_value("TODO: put the actual expected hash here from ethash");
-	string const expected_mixhash("TODO: put the actual expected mixhash here from ethash");
+	std::vector<std::tuple<uint64_t, std::string, std::string>> vExpected = {
+	  std::make_tuple(0x7c7c597c, "e85cb09f99553758a8a794633c93ed25318e2f2839b3a85328e775220ab0a14d", "deafd12b8f35f15b2cac9455ee4f32620cea6727e18e21a81b196633a74d6018")
+	 ,std::make_tuple(0xFFFFFFFF00000000, "c2005aa32d527dcbce043648eb04d818be68c8649d353d29eb3c9d5d15927a25", "b0d1c89335fafb7b8c9591fc58623ddf342977cffec88d8d84f14bbfe6f4f651")
+	 ,std::make_tuple(1234567890, "1e884b98b307fa44e7ba1d015f6fab47303ac41d04638076479421ea91ea633a", "af969a99b8ee5934b9598a646361675c3b7b8783754e011edd9eb9a702c7711a")
+	};
 
+	for ( auto const & expected : vExpected )
 	{
-		auto const h = full::hash(d, rawdata.c_str(), rawdata.size());
-		auto const value_str = toHex(h.value.b, h.value.hash_size);
-		auto const mix_str = toHex(h.mixhash.b, h.mixhash.hash_size);
-		BOOST_CHECK_MESSAGE(value_str == expected_value, "\nactual=" << value_str << "\nexpected=" << expected_value);
-		BOOST_CHECK_MESSAGE(mix_str == expected_mixhash, "\nactual=" << mix_str << "\nexpected=" << expected_mixhash);
+		for(auto i = 0; i < 2; ++i)
+		{
+			auto const h = i == 0 ? full::hash(d, h256_t(rawdata.c_str(), rawdata.size()), std::get<0>(expected)) : light::hash(d.get_cache(), h256_t(rawdata.c_str(), rawdata.size()), std::get<0>(expected));
+			auto const value_str = toHex(h.value.b, h.value.hash_size);
+			auto const mix_str = toHex(h.mixhash.b, h.mixhash.hash_size);
+			BOOST_CHECK_MESSAGE(value_str == std::get<1>(expected), "\nnounce=" << std::get<0>(expected) << "\nactual=" << value_str << "\nexpected=" << std::get<1>(expected));
+			BOOST_CHECK_MESSAGE(mix_str == std::get<2>(expected), "\nnounce=" << std::get<0>(expected) << "\nactual=" << mix_str << "\nexpected=" << std::get<2>(expected));
+		}
 	}
 
-	{
-		auto const h = light::hash(d.get_cache(), rawdata.c_str(), rawdata.size());
-		auto const value_str = toHex(h.value.b, h.value.hash_size);
-		auto const mix_str = toHex(h.mixhash.b, h.mixhash.hash_size);
-		BOOST_CHECK_MESSAGE(value_str == expected_value, "\nactual=" << value_str << "\nexpected=" << expected_value);
-		BOOST_CHECK_MESSAGE(mix_str == expected_mixhash, "\nactual=" << mix_str << "\nexpected=" << expected_mixhash);
-	}
 	d.unload();
 }
+
 
 BOOST_AUTO_TEST_CASE(FULL_CLIENT)
 {
@@ -182,8 +191,6 @@ BOOST_AUTO_TEST_CASE(FULL_CLIENT)
 	fs::path egiDagPath = fs::current_path() / "data" / filename_egi;
 	fs::path etDagPath = fs::current_path() / "data" / filename_et;
 
-	cout << egihash::cache_t::get_cache_size(0) << endl;
-	cout << egihash::dag_t::get_full_size(0) << endl;
 	BOOST_ASSERT(16776896 == egihash::cache_t::get_cache_size(0));
 	BOOST_ASSERT(1073739904 == egihash::dag_t::get_full_size(0));
 
@@ -248,122 +255,18 @@ BOOST_AUTO_TEST_CASE(FULL_CLIENT)
 
 		cout << egiDagSizeSkip << endl;
 		constexpr uint32_t BUFFER_SIZE = 32 * 1024 * 1024;
-		constexpr uint32_t HASH_BYTES = 64;
-		constexpr uint32_t DATA_TO_READ = HASH_BYTES * 2;
+		constexpr uint32_t DATA_TO_READ = 1024;
 		std::unique_ptr<uint8_t[]> buffer_eg (new uint8_t[BUFFER_SIZE]);
 		std::unique_ptr<uint8_t[]> buffer_et (new uint8_t[BUFFER_SIZE]);
 
 		dag_eghash_if.read(reinterpret_cast<char*>(buffer_eg.get()), egiDagSizeSkip);
-		dag_ethash_if.read(reinterpret_cast<char*>(buffer_et.get()), 8); // ETHash DAG header size is 8 bytes
-
 		dag_eghash_if.read(reinterpret_cast<char*>(buffer_eg.get()), DATA_TO_READ);
 		dag_ethash_if.read(reinterpret_cast<char*>(buffer_et.get()), DATA_TO_READ);
 		auto eg_read = dag_eghash_if.gcount(), et_read = dag_ethash_if.gcount();
 		BOOST_ASSERT(eg_read == DATA_TO_READ);
 		BOOST_ASSERT(eg_read == et_read);
 		BOOST_ASSERT( ( dag_eghash_if.eof() && dag_ethash_if.eof()) || ( !dag_eghash_if.eof()&& !dag_ethash_if.eof() ) );
-		auto max_iter = std::min( static_cast<uint32_t>(eg_read) / HASH_BYTES, 2U);
-		for ( uint32_t iter = 0; iter < max_iter; ++iter)
-		{
-			cout << "EGIHASH: "<< toHex(buffer_eg.get() + iter * HASH_BYTES, HASH_BYTES) << endl;
-			cout << "ETHASH: " << toHex(buffer_et.get() + iter * HASH_BYTES, HASH_BYTES) << endl;
-		}
 		BOOST_ASSERT( 0 == ::std::memcmp(buffer_et.get(), buffer_eg.get(), eg_read) );
 	}
 }
-
-
-/*BOOST_AUTO_TEST_CASE(GENESIS_BLOCK_HASH_TEST)
-{
-	string filename_egi = string("egihash.dag");
-	fs::path egiDagPath = fs::current_path() / "data" / filename_egi;
-
-	cout << egihash::cache_t::get_cache_size(0) << endl;
-	cout << egihash::dag_t::get_full_size(0) << endl;
-	BOOST_ASSERT(16776896 == egihash::cache_t::get_cache_size(0));
-	BOOST_ASSERT(1073739904 == egihash::dag_t::get_full_size(0));
-
-	if ( !boost::filesystem::exists( egiDagPath ) )
-	{
-		auto progress = [](::std::size_t step, ::std::size_t max, int phase) -> bool
-		{
-			switch(phase)
-			{
-				case egihash::cache_seeding:
-					cout << "Seeding cache..." << endl;
-					break;
-				case egihash::cache_generation:
-					cout << "Generating cache..." << endl;
-					break;
-				case egihash::cache_saving:
-					cout << "Saving cache..." << endl;
-					break;
-				case egihash::cache_loading:
-					cout << "Loading cache..." << endl;
-					break;
-				case egihash::dag_generation:
-					cout << "Generating DAG..." << endl;
-					break;
-				case egihash::dag_saving:
-					cout << "Saving DAG..." << endl;
-					break;
-				case egihash::dag_loading:
-					cout << "Loading DAG..." << endl;
-					break;
-				default:
-					break;
-			}
-
-			cout << fixed << setprecision(2)
-			<< static_cast<double>(step) / static_cast<double>(max) * 100.0 << "%"
-			<< setfill(' ') << setw(80) << flush;
-
-			return true;
-		};
-		egihash::dag_t dag(0, progress);
-		dag.save(egiDagPath.string());
-	}
-
-	ifstream dag_eghash_if(egiDagPath.string().c_str(), std::ios_base::binary);
-	BOOST_ASSERT(dag_eghash_if.is_open());
-	if ( dag_eghash_if.is_open() )
-	{
-		uint64_t egiDagSizeSkip = sizeof(egihash::constants::DAG_MAGIC_BYTES) +
-					sizeof(egihash::constants::MAJOR_VERSION) +
-					sizeof(egihash::constants::REVISION) +
-					sizeof(egihash::constants::MINOR_VERSION) +
-					sizeof(uint64_t) + // epoch
-					sizeof(uint64_t) + // cache begin
-					sizeof(uint64_t) + // cache_end
-					sizeof(uint64_t) + // dag_begin
-					sizeof(uint64_t);// dag_end
-
-		egiDagSizeSkip += egihash::cache_t::get_cache_size(0);
-
-		cout << egiDagSizeSkip << endl;
-		constexpr uint32_t BUFFER_SIZE = 32 * 1024 * 1024;
-		constexpr uint32_t HASH_BYTES = 64;
-		constexpr uint32_t DATA_TO_READ = HASH_BYTES * 2;
-		std::unique_ptr<uint8_t[]> buffer_eg (new uint8_t[BUFFER_SIZE]);
-		std::unique_ptr<uint8_t[]> buffer_et (new uint8_t[BUFFER_SIZE]);
-
-		dag_eghash_if.read(reinterpret_cast<char*>(buffer_eg.get()), egiDagSizeSkip);
-		dag_ethash_if.read(reinterpret_cast<char*>(buffer_et.get()), 8); // ETHash DAG header size is 8 bytes
-
-		dag_eghash_if.read(reinterpret_cast<char*>(buffer_eg.get()), DATA_TO_READ);
-		dag_ethash_if.read(reinterpret_cast<char*>(buffer_et.get()), DATA_TO_READ);
-		auto eg_read = dag_eghash_if.gcount(), et_read = dag_ethash_if.gcount();
-		BOOST_ASSERT(eg_read == DATA_TO_READ);
-		BOOST_ASSERT(eg_read == et_read);
-		BOOST_ASSERT( ( dag_eghash_if.eof() && dag_ethash_if.eof()) || ( !dag_eghash_if.eof()&& !dag_ethash_if.eof() ) );
-		auto max_iter = std::min( static_cast<uint32_t>(eg_read) / HASH_BYTES, 2U);
-		for ( uint32_t iter = 0; iter < max_iter; ++iter)
-		{
-			cout << "EGIHASH: "<< toHex(buffer_eg.get() + iter * HASH_BYTES, HASH_BYTES) << endl;
-			cout << "ETHASH: " << toHex(buffer_et.get() + iter * HASH_BYTES, HASH_BYTES) << endl;
-		}
-		BOOST_ASSERT( 0 == ::std::memcmp(buffer_et.get(), buffer_eg.get(), eg_read) );
-	}
-}*/
-
 
