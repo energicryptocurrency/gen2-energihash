@@ -270,3 +270,8 @@ BOOST_AUTO_TEST_CASE(FULL_CLIENT)
 	}
 }
 
+BOOST_AUTO_TEST_CASE(SEEDHASH_FILE_NAME_TEST)
+{
+	auto seedhash = egihash::get_seedhash(0);
+	std::cout << egihash::seedhash_to_filename(seedhash) << std::endl;
+}

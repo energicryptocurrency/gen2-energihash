@@ -362,25 +362,24 @@ namespace egihash
 	::std::string get_seedhash(uint64_t const block_number)
 	{
 		::std::string s(epoch0_seedhash, size_epoch0_seedhash);
-//		// convert seedhash to hex
-		// This step wont help in writing comparison tests with ethash and why do we need this anyway?
-//		{
-//			// TODO: fast hex conversion
-//			::std::stringstream ss;
-//			ss << ::std::hex;
-//			for (auto const i : s)
-//			{
-//				ss << ::std::setw(2) << ::std::setfill('0') << static_cast<uint16_t>(i);
-//			}
-//			s = ss.str();
-//		}
-		
 		for (size_t i = 0; i < (block_number / constants::EPOCH_LENGTH); i++)
 		{
 			s = sha3_256_t::serialize(sha3_256(s));
 		}
 		return s;
 	}
+
+	std::string seedhash_to_filename(const std::string &seedhash)
+	{
+		std::stringstream ss;
+		ss << std::hex << std::nouppercase;
+		for (auto const i : seedhash)
+		{
+			ss << std::setfill('0') << std::setw(2)  << static_cast<uint16_t>(i);
+		}
+		return ss.str();
+	}
+
 
 	struct cache_t::impl_t
 	{
@@ -993,7 +992,7 @@ namespace egihash
 				cmix.push_back(node(fnv(fnv(fnv(mix[i].hword, mix[i+1].hword), mix[i+2].hword), mix[i+3].hword)));
 			}
 
-			auto combined = s;
+			auto combined = std::move(s);
 			combined.insert(combined.end(), cmix.begin(), cmix.end());
 			auto v = sha3_256(combined);
 			result_t out;
