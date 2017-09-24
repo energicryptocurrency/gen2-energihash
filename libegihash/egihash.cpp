@@ -204,26 +204,14 @@ namespace
 			}
 		}
 
-		deserialized_hash_t deserialize() const
+ 		inline deserialized_hash_t deserialize() const
 		{
-			deserialized_hash_t out(hash_size / 4, node());
-			size_t j = 0;
-			for (auto const & i : data)
-			//for (size_t i = 0, j = 0; i < hash_size; i += constants::WORD_BYTES, j++)
-			{
-				out[j++] = decode_int(&i.bytes[0], &i.bytes[3]);
-			}
-			return out;
+			return data;
 		}
 
-		static ::std::string serialize(deserialized_hash_t const & h)
+		inline static ::std::string serialize(deserialized_hash_t const & h)
 		{
-			::std::string ret;
-			for (auto const i : h)
-			{
-				ret += zpad(encode_int(i.hword), 4);
-			}
-			return ret;
+			return std::string(reinterpret_cast<const char*>(h.data()), h.size() * sizeof(node));
 		}
 
 		operator ::std::string() const
@@ -280,8 +268,7 @@ namespace
 	template <typename HashType>
 	typename HashType::deserialized_hash_t hash_words(::std::string const & data)
 	{
-		auto const hash = HashType(data);
-		return hash.deserialize();
+		return HashType(data).data;
 	}
 
 	// TODO: unit tests / validation
@@ -375,23 +362,24 @@ namespace egihash
 	::std::string get_seedhash(uint64_t const block_number)
 	{
 		::std::string s(epoch0_seedhash, size_epoch0_seedhash);
-		// convert seedhash to hex
-		{
-			// TODO: fast hex conversion
-			::std::stringstream ss;
-			ss << ::std::hex;
-			for (auto const i : s)
-			{
-				ss << ::std::setw(2) << ::std::setfill('0') << static_cast<uint16_t>(i);
-			}
-			s = ss.str();
-		}
 		for (size_t i = 0; i < (block_number / constants::EPOCH_LENGTH); i++)
 		{
 			s = sha3_256_t::serialize(sha3_256(s));
 		}
 		return s;
 	}
+
+	std::string seedhash_to_filename(const std::string &seedhash)
+	{
+		std::stringstream ss;
+		ss << std::hex << std::nouppercase;
+		for (auto const i : seedhash)
+		{
+			ss << std::setfill('0') << std::setw(2)  << static_cast<uint16_t>(i);
+		}
+		return ss.str();
+	}
+
 
 	struct cache_t::impl_t
 	{
@@ -966,51 +954,63 @@ namespace egihash
 #endif // 0
 
 	// TODO: unify light & full implementation
-	namespace full
+	namespace hashimoto
 	{
-		result_t hash(dag_t const & dag, void const * input_data, dag_t::size_type input_size)
+		using mediator_get_dag_size = std::function<dag_t::size_type ()>;
+		using mediator_get_dag_item = std::function<std::vector<node> const (uint32_t index)>;
+
+		result_t hash(void const * input_data, dag_t::size_type input_size, mediator_get_dag_size get_dag_size, mediator_get_dag_item get_dag_item)
 		{
-			auto const n = dag.size() / constants::HASH_BYTES;
 			static constexpr auto w = constants::MIX_BYTES / constants::WORD_BYTES;
-			static constexpr auto mixhashes = constants::MIX_BYTES / constants::HASH_BYTES;
+			auto MIXNODES = (constants::MIX_BYTES / constants::HASH_BYTES);
 
-			sha3_256_t first_hash(input_data, input_size);
-
-			auto s = sha3_512(first_hash.deserialize());
+			auto s = sha3_512(std::string(static_cast<const char*>(input_data), input_size));
 			decltype(s) mix;
-			for (size_t i = 0; i < (constants::MIX_BYTES / constants::HASH_BYTES); i++)
+			for (uint32_t i = 0; i < MIXNODES; i++)
 			{
 				mix.insert(mix.end(), s.begin(), s.end());
 			}
 
-			for (size_t i = 0; i < constants::ACCESSES; i++)
+			uint32_t const full_page_count = (uint32_t) ( get_dag_size() / constants::MIX_BYTES );
+			for (uint32_t i = 0; i < constants::ACCESSES; i++)
 			{
-				auto p = fnv(i ^ s[0].hword, mix[i % w].hword) % (n / mixhashes) * mixhashes;
-				decltype(s) newdata;
-				for (size_t j = 0; j < (constants::MIX_BYTES / constants::HASH_BYTES); j++)
+				auto p = fnv(i ^ s[0].hword, mix[i % w].hword) % full_page_count;
+				for (uint32_t j = 0; j < MIXNODES; j++)
 				{
-					auto const & h = dag.data()[p + j];
-					newdata.insert(newdata.end(), h.begin(), h.end());
-				}
-				for (auto j = mix.begin(), jEnd = mix.end(), k = newdata.begin(), kEnd = newdata.end(); j != jEnd && k != kEnd; j++, k++)
-				{
-					j->hword = fnv(j->hword, k->hword);
+					auto h = get_dag_item(p * MIXNODES + j);
+					auto k = h.begin(), kEnd = h.end();
+					for (auto m = mix.begin() + j * w / 2, mEnd = mix.begin() + ( j + 1 ) * w / 2; m != mEnd && k != kEnd; m++, k++)
+					{
+						m->hword = fnv(m->hword, k->hword);
+					}
 				}
 			}
 
 			decltype(s) cmix;
-			for (size_t i = 0; i < mix.size(); i += 4)
+			for (uint32_t i = 0; i < mix.size(); i += 4)
 			{
 				cmix.push_back(node(fnv(fnv(fnv(mix[i].hword, mix[i+1].hword), mix[i+2].hword), mix[i+3].hword)));
 			}
 
-			auto v = sha3_256(s);
+			auto combined = std::move(s);
+			combined.insert(combined.end(), cmix.begin(), cmix.end());
+			auto v = sha3_256(combined);
 			result_t out;
-			::std::memcpy(&out.value.b[0], &v[0], ::std::min(sizeof(out.value.b), v.size()));
-			::std::memcpy(&out.mixhash.b[0], &cmix[0], ::std::min(sizeof(out.mixhash.b), cmix.size()));
+			::std::memcpy(&out.value.b[0], &v[0], ::std::min(sizeof(out.value.b), v.size() * sizeof(node)));
+			::std::memcpy(&out.mixhash.b[0], &cmix[0], ::std::min(sizeof(out.mixhash.b), cmix.size() * sizeof(node)));
 			return out;
 		}
+	}
+	namespace full
+	{
 
+
+		result_t hash(dag_t const & dag, void const * input_data, dag_t::size_type input_size)
+		{
+			return hashimoto::hash(input_data, input_size
+					, [&]() -> dag_t::size_type { return dag.size(); }
+					, [&](uint32_t index) -> std::vector<node> const { return dag.data()[index]; });
+		}
 		result_t hash(dag_t const & dag, h256_t const & header_hash, uint64_t const nonce)
 		{
 			std::function<result_t (dag_t const &, void const *, dag_t::size_type)> hash_func = static_cast<result_t (*)(dag_t const &, void const *, dag_t::size_type)>(&hash);
@@ -1022,45 +1022,9 @@ namespace egihash
 	{
 		result_t hash(cache_t const & cache, void const * input_data, cache_t::size_type input_size)
 		{
-			auto const n = dag_t::get_full_size((cache.epoch() * constants::EPOCH_LENGTH) + 1) / constants::HASH_BYTES;
-			static constexpr auto w = constants::MIX_BYTES / constants::WORD_BYTES;
-			static constexpr auto mixhashes = constants::MIX_BYTES / constants::HASH_BYTES;
-
-			sha3_256_t first_hash(input_data, input_size);
-
-			auto s = sha3_512(first_hash.deserialize());
-			decltype(s) mix;
-			for (size_t i = 0; i < (constants::MIX_BYTES / constants::HASH_BYTES); i++)
-			{
-				mix.insert(mix.end(), s.begin(), s.end());
-			}
-
-			for (size_t i = 0; i < constants::ACCESSES; i++)
-			{
-				auto p = fnv(i ^ s[0].hword, mix[i % w].hword) % (n / mixhashes) * mixhashes;
-				decltype(s) newdata;
-				for (size_t j = 0; j < (constants::MIX_BYTES / constants::HASH_BYTES); j++)
-				{
-					auto const & h = dag_t::impl_t::calc_dataset_item(cache.data(), p + j);
-					newdata.insert(newdata.end(), h.begin(), h.end());
-				}
-				for (auto j = mix.begin(), jEnd = mix.end(), k = newdata.begin(), kEnd = newdata.end(); j != jEnd && k != kEnd; j++, k++)
-				{
-					j->hword = fnv(j->hword, k->hword);
-				}
-			}
-
-			decltype(s) cmix;
-			for (size_t i = 0; i < mix.size(); i += 4)
-			{
-				cmix.push_back(node(fnv(fnv(fnv(mix[i].hword, mix[i+1].hword), mix[i+2].hword), mix[i+3].hword)));
-			}
-
-			auto v = sha3_256(s);
-			result_t out;
-			::std::memcpy(&out.value.b[0], &v[0], ::std::min(sizeof(out.value.b), v.size()));
-			::std::memcpy(&out.mixhash.b[0], &cmix[0], ::std::min(sizeof(out.mixhash.b), cmix.size()));
-			return out;
+			return hashimoto::hash(input_data, input_size
+					, [&]() -> dag_t::size_type { return dag_t::get_full_size((cache.epoch() * constants::EPOCH_LENGTH)); }
+					, [&](uint32_t index) -> std::vector<node> const { return dag_t::impl_t::calc_dataset_item(cache.data(), index); });
 		}
 
 		result_t hash(cache_t const & cache, h256_t const & header_hash, uint64_t const nonce)
