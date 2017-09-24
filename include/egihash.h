@@ -171,6 +171,13 @@ namespace egihash
 	*/
 	::std::string get_seedhash(uint64_t const block_number);
 
+	/** \brief function to provide readble dag file name
+	*
+	*	\param A hexidecimal encoded keccak-256 seed hash for the given block number.
+	*	\return A readable filename
+	*/
+	std::string seedhash_to_filename(const std::string &seedhash);
+
 	/** \brief h256_t represents a the result of a keccak-256 hash.
 	*/
 	struct h256_t
