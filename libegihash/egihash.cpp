@@ -385,6 +385,7 @@ namespace egihash
 	{
 		using size_type = cache_t::size_type;
 		using data_type = ::std::vector<std::vector<node>>;
+		using cache_cache_map = ::std::map<uint64_t /* epoch */, ::std::shared_ptr<impl_t>>;
 
 		impl_t(uint64_t const block_number, ::std::string const & seed, progress_callback_type callback)
 		: epoch(block_number / constants::EPOCH_LENGTH)
@@ -475,8 +476,66 @@ namespace egihash
 		data_type data;
 	};
 
+	// construct on first use mutex ensures safe static initialization order
+	std::recursive_mutex & get_cache_cache_mutex()
+	{
+		static std::recursive_mutex mutex;
+		return mutex;
+	}
+	// ensures single threaded construction
+	std::recursive_mutex & cache_cache_mutex = get_cache_cache_mutex();
+
+	// construct on first use dag_cache_map ensures safe static initialization order
+	cache_t::impl_t::cache_cache_map & get_cache_cache()
+	{
+		std::lock_guard<std::recursive_mutex> lock(get_cache_cache_mutex());
+		static cache_t::impl_t::cache_cache_map cache_cache;
+		return cache_cache;
+	}
+	// ensures single threaded construction
+	cache_t::impl_t::cache_cache_map & cache_cache = get_cache_cache();
+
+	::std::shared_ptr<cache_t::impl_t> get_cache_from_cache(uint64_t const block_number, ::std::string const & seed, progress_callback_type callback)
+	{
+		using namespace std;
+		uint64_t epoch_number = block_number / constants::EPOCH_LENGTH;
+
+		// if we have the correct cache already loaded, return it from the cache cache
+		{
+			lock_guard<recursive_mutex> lock(get_cache_cache_mutex());
+			auto const cache_cache_iterator = get_cache_cache().find(epoch_number);
+			if (cache_cache_iterator != get_cache_cache().end())
+			{
+				return cache_cache_iterator->second;
+			}
+		}
+
+		// otherwise create the cache and add it to the cache cache
+		// this is not locked as it can be a lengthy process and we don't want to block access to the cache cache
+		shared_ptr<cache_t::impl_t> impl(new cache_t::impl_t(block_number, seed, callback));
+
+		lock_guard<recursive_mutex> lock(get_cache_cache_mutex());
+		auto insert_pair = get_cache_cache().insert(make_pair(epoch_number, impl));
+
+		// if insert succeded, return the cache
+		if (insert_pair.second)
+		{
+			return insert_pair.first->second;
+		}
+
+		// if insert failed, it's probably already been inserted
+		auto const cache_cache_iterator = get_cache_cache().find(epoch_number);
+		if (cache_cache_iterator != get_cache_cache().end())
+		{
+			return cache_cache_iterator->second;
+		}
+
+		// we couldn't insert it and it's not in the cache
+		throw hash_exception("Could not get cache");
+	}
+
 	cache_t::cache_t(uint64_t const block_number, ::std::string const & seed, progress_callback_type callback)
-	: impl(new impl_t(block_number, seed, callback))
+	: impl(get_cache_from_cache(block_number, seed, callback))
 	{
 	}
 
