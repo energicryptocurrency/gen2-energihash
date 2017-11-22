@@ -690,7 +690,7 @@ namespace egihash
 
 		// if we have the correct DAG already loaded, return it from the cache
 		{
-			lock_guard<std::recursive_mutex> lock(get_dag_cache_mutex());
+			lock_guard<recursive_mutex> lock(get_dag_cache_mutex());
 			auto const dag_cache_iterator = get_dag_cache().find(epoch_number);
 			if (dag_cache_iterator != get_dag_cache().end())
 			{
@@ -702,7 +702,7 @@ namespace egihash
 		// this is not locked as it can be a lengthy process and we don't want to block access to the dag cache
 		shared_ptr<dag_t::impl_t> impl(new dag_t::impl_t(block_number, callback));
 
-		lock_guard<std::recursive_mutex> lock(get_dag_cache_mutex());
+		lock_guard<recursive_mutex> lock(get_dag_cache_mutex());
 		auto insert_pair = get_dag_cache().insert(make_pair(epoch_number, impl));
 
 		// if insert succeded, return the dag
@@ -801,7 +801,7 @@ namespace egihash
 
 		// if we have the correct DAG already loaded, return it from the cache
 		{
-			lock_guard<std::recursive_mutex> lock(get_dag_cache_mutex());
+			lock_guard<recursive_mutex> lock(get_dag_cache_mutex());
 			auto const dag_cache_iterator = get_dag_cache().find(header.epoch);
 			if (dag_cache_iterator != get_dag_cache().end())
 			{
@@ -813,7 +813,7 @@ namespace egihash
 		// this is not locked as it can be a lengthy process and we don't want to block access to the dag cache
 		shared_ptr<dag_t::impl_t> impl(new dag_t::impl_t(read, header, callback));
 
-		lock_guard<std::recursive_mutex> lock(get_dag_cache_mutex());
+		lock_guard<recursive_mutex> lock(get_dag_cache_mutex());
 		auto insert_pair = get_dag_cache().insert(make_pair(header.epoch, impl));
 
 		// if insert succeded, return the dag
