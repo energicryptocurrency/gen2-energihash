@@ -377,6 +377,10 @@ namespace egihash
 		*/
 		static size_type get_cache_size(uint64_t const block_number) noexcept;
 
+		/** \brief cache_t internal implementation.
+		*/
+		struct impl_t;
+
 	private:
 		friend struct dag_t;
 
@@ -395,10 +399,6 @@ namespace egihash
 		*	\param callback (optional) may be used to monitor the progress of cache loading. Return false to cancel, true to continue.
 		*/
 		void load(read_function_type read, progress_callback_type callback = [](size_type, size_type, int){ return true; });
-
-		/** \brief cache_t private implementation.
-		*/
-		struct impl_t;
 
 		/** \brief shared_ptr to impl allows default moving/copying of cache. Internally, only one cache_t::impl_t per epoch will exist.
 		*/
