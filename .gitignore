@@ -31,3 +31,22 @@
 *.out
 *.app
 /egihash
+
+# Autotools files
+*.deps
+*.m4
+.libs
+autom4te.cache
+compile
+config.guess
+config.log
+config.status
+config.sub
+configure
+depcomp
+install-sh
+libtool
+ltmain.sh
+Makefile
+Makefile.in
+missing
