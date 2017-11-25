@@ -1,11 +1,11 @@
 dnl Process this file with autoconf to produce a configure script.
 
-AC_PREREQ(2.59)
-AC_INIT(egihash, 1.0)
+AC_PREREQ([2.69])
+AC_INIT([egihash],[1.0])
 AC_PROG_CC
 AC_PROG_CXX
 
-AC_CANONICAL_SYSTEM
+AC_CANONICAL_TARGET
 
 AC_CONFIG_MACRO_DIR([m4])
 
