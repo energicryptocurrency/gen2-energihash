@@ -39,12 +39,25 @@ using byte = uint8_t;
 using bytes = std::vector<byte>;
 namespace fs = boost::filesystem;
 
-
 namespace
 {
 	bool dag_progress(::std::size_t step, ::std::size_t max, int phase)
 	{
-		switch(phase)
+		using namespace egihash;
+
+		// saving output for longer running tasks like DAG generation
+		switch (phase)
+		{
+			case cache_saving:
+			case cache_loading:
+			case dag_saving:
+			case dag_loading:
+				return true;
+			default:
+				break;
+		}
+
+		switch (phase)
 		{
 			case cache_seeding:
 				cout << "\rSeeding cache...";
@@ -73,7 +86,9 @@ namespace
 
 		cout << fixed << setprecision(2)
 			<< static_cast<double>(step) / static_cast<double>(max) * 100.0 << "%"
-			<< setfill(' ') << setw(80) << "\r" << endl;
+			<< setfill(' ') << setw(80) << flush;
+
+		if (step == max) cout << "\r" << endl;
 
 		return true;
 	};
@@ -110,7 +125,6 @@ namespace
 		    	hcPath = fs::path(BOOST_PP_STRINGIZE(TEST_DATA_DIR)) / filename;
 		    }
 		#endif
-		    cout << hcPath.string() << endl;
 			ifstream hif(hcPath.string().c_str());
 			BOOST_REQUIRE_MESSAGE(hif.is_open(), "hash cache missing?");
 			if ( hif.is_open() )
@@ -128,7 +142,6 @@ namespace
 						memcpy(&input, hashSource.c_str(), HashTrait::Size / 8);
 						HashTrait::compute(&hashRaw, input.b, HashTrait::Size / 8);
 						auto actual = toHex((uint8_t*)&hashRaw, HashTrait::Size / 8);
-						//cout << hashSource << "," << actual << endl;
 						BOOST_REQUIRE_MESSAGE(hashExpected == actual, "\nsource: " << hashSource << "\nexpected: " << hashExpected.c_str() << "\n" << "actual: " << actual.c_str() << "\n");
 					}
 				}
@@ -156,13 +169,11 @@ BOOST_AUTO_TEST_CASE(EGIHASH_HASHIMOTO)
 
 	if (!boost::filesystem::exists( "data/egihash.dag" ))
 	{
-		std::cout << "data/egihash.dag does not exist yet! will be auto generated" << std::endl;
 		egihash::dag_t dag(0, dag_progress);
 		dag.save("data/egihash.dag");
 	}
 
 	dag_t d("data/egihash.dag", dag_progress);
-	cout << endl;
 
 	string rawdata("this is a test string to be hashed");
 	std::vector<std::tuple<uint64_t, std::string, std::string>> vExpected = {
@@ -221,7 +232,6 @@ BOOST_AUTO_TEST_CASE(FULL_CLIENT)
 
 		egiDagSizeSkip += egihash::cache_t::get_cache_size(0);
 
-		cout << egiDagSizeSkip << endl;
 		constexpr uint32_t BUFFER_SIZE = 32 * 1024 * 1024;
 		constexpr uint32_t DATA_TO_READ = 1024;
 		std::unique_ptr<uint8_t[]> buffer_eg (new uint8_t[BUFFER_SIZE]);
@@ -240,8 +250,8 @@ BOOST_AUTO_TEST_CASE(FULL_CLIENT)
 
 BOOST_AUTO_TEST_CASE(SEEDHASH_FILE_NAME_TEST)
 {
-	auto seedhash = egihash::get_seedhash(0);
-	std::cout << egihash::seedhash_to_filename(seedhash) << std::endl;
+	using namespace egihash;
+	BOOST_ASSERT(seedhash_to_filename(get_seedhash(0)) == "ffa8494bffb2ff895bffd7ffed18ffbb39ffb7ffb2ff8afff51dffec51fff7ffcaffd330ffc168fff1ffbd1cff90ffe7614c32");
 }
 
 // test that light hashes and full hashes produce the same values
@@ -252,14 +262,12 @@ BOOST_AUTO_TEST_CASE(light_hash_vs_full_hash_comparison)
 
 	if (!boost::filesystem::exists( "data/egihash.dag" ))
 	{
-		std::cout << "data/egihash.dag does not exist yet! will be auto generated" << std::endl;
 		egihash::dag_t dag(0, dag_progress);
 		dag.save("data/egihash.dag");
 	}
 
 	dag_t d("data/egihash.dag", dag_progress);
 	cache_t c(d.get_cache());
-	cout << endl;
 
 	string rawdata("this is a test string to be hashed");
 	h256_t firsthash(rawdata.c_str(), rawdata.size());
