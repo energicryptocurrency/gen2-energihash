@@ -272,7 +272,7 @@ BOOST_AUTO_TEST_CASE(light_hash_vs_full_hash_comparison)
 	string rawdata("this is a test string to be hashed");
 	h256_t firsthash(rawdata.c_str(), rawdata.size());
 
-	for (size_t i = 0; i < 10; i++)
+	for (size_t i = 0; i < 1000; i++)
 	{
 		uint64_t nonce = (*reinterpret_cast<uint64_t *>(&firsthash.b[0])) ^ (*reinterpret_cast<uint64_t *>(&firsthash.b[16]));
 		firsthash = h256_t(&firsthash.b[0], firsthash.hash_size);
