@@ -2,12 +2,12 @@
 # The list of executables we are building seperated by spaces
 # the 'bin_' indicates that these build products will be installed
 # in the $(bindir) directory. For example /usr/bin
-bin_PROGRAMS=egihash_test
+#bin_PROGRAMS=egihash_test
 
 # Because a.out is only a sample program we don't want it to be installed.
 # The 'noinst_' prefix indicates that the following targets are not to be
 # installed.
-#noinst_PROGRAMS=egihash_test
+noinst_PROGRAMS=egihash_test
 
 #######################################
 # Build information for each executable. The variable name is derived
