@@ -275,3 +275,87 @@ BOOST_AUTO_TEST_CASE(SEEDHASH_FILE_NAME_TEST)
 	auto seedhash = egihash::get_seedhash(0);
 	std::cout << egihash::seedhash_to_filename(seedhash) << std::endl;
 }
+
+// test that light hashes and full hashes produce the same values
+BOOST_AUTO_TEST_CASE(light_hash_vs_full_hash_comparison)
+{
+	using namespace std;
+	using namespace egihash;
+
+	auto progress = [](::std::size_t step, ::std::size_t max, int phase) -> bool
+	{
+		switch(phase)
+		{
+			case cache_seeding:
+				cout << "\rSeeding cache...";
+				break;
+			case cache_generation:
+				cout << "\rGenerating cache...";
+				break;
+			case cache_saving:
+				cout << "\rSaving cache...";
+				break;
+			case cache_loading:
+				cout << "\rLoading cache...";
+				break;
+			case dag_generation:
+				cout << "\rGenerating DAG...";
+				break;
+			case dag_saving:
+				cout << "\rSaving DAG...";
+				break;
+			case dag_loading:
+				cout << "\rLoading DAG...";
+				break;
+			default:
+				break;
+		}
+		cout << fixed << setprecision(2)
+		<< static_cast<double>(step) / static_cast<double>(max) * 100.0 << "%"
+		<< setfill(' ') << setw(80) << flush;
+
+		return true;
+	};
+
+	if (!boost::filesystem::exists( "data/egihash.dag" ))
+	{
+		std::cout << "data/egihash.dag does not exist yet! will be auto generated" << std::endl;
+		egihash::dag_t dag(0, progress);
+		dag.save("data/egihash.dag");
+	}
+
+	dag_t d("data/egihash.dag", progress);
+	cache_t c(d.get_cache());
+	cout << endl;
+
+	string rawdata("this is a test string to be hashed");
+	h256_t firsthash(rawdata.c_str(), rawdata.size());
+
+	for (size_t i = 0; i < 10; i++)
+	{
+		uint64_t nonce = (*reinterpret_cast<uint64_t *>(&firsthash.b[0])) ^ (*reinterpret_cast<uint64_t *>(&firsthash.b[16]));
+		firsthash = h256_t(&firsthash.b[0], firsthash.hash_size);
+		auto const lighthash = light::hash(c, firsthash, nonce);
+		auto const fullhash = full::hash(d, firsthash, nonce);
+		cout << "\r[" << toHex(&firsthash.b[0], firsthash.hash_size) << "," << nonce << "] -> "
+			<< "\"" << toHex(&lighthash.value.b[0], lighthash.value.hash_size) << "\" == \""
+			<< toHex(&fullhash.value.b[0], fullhash.value.hash_size) << "\"" << endl;
+
+		// check that the hashes are nonempty
+		BOOST_ASSERT(lighthash);
+		BOOST_ASSERT(fullhash);
+
+		// check the byte for byte value and the mixhash is the same for both light and full hashes
+		BOOST_ASSERT(memcmp(&lighthash.value.b[0], &fullhash.value.b[0], (std::min)(lighthash.value.hash_size, fullhash.value.hash_size)) == 0);
+		BOOST_ASSERT(memcmp(&lighthash.mixhash.b[0], &fullhash.value.b[0], (std::min)(lighthash.value.hash_size, fullhash.value.hash_size)) == 0);
+
+		// checks operator== for egihash::h256_t
+		BOOST_ASSERT(lighthash.value == fullhash.value);
+		BOOST_ASSERT(lighthash.mixhash == fullhash.mixhash);
+
+		// checks operator== for egihash::result_t
+		BOOST_ASSERT(lighthash == fullhash);
+	}
+
+	d.unload();
+}
