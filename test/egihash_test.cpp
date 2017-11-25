@@ -40,84 +40,9 @@ using bytes = std::vector<byte>;
 namespace fs = boost::filesystem;
 
 
-BOOST_AUTO_TEST_SUITE(TODO_name_a_test_suite);
-
-std::string toHex(const uint8_t *streamBytes, const uint64_t size)
+namespace
 {
-	std::stringstream sHex;
-	for( uint64_t iter = 0; iter < size; ++iter )
-	{
-		sHex << std::nouppercase << std::hex << std::setw(2) << std::setfill('0') << static_cast<int>(streamBytes[iter]);
-	}
-	return sHex.str();
-}
-
-template <typename HashType
-, size_t HashSize
-, void (*Compute)(HashType * output_hash, void * input_data, uint64_t input_size)>
-struct HashTrait
-{
-	static constexpr size_t Size = HashSize;
-	static constexpr decltype(Compute) compute = Compute;
-	using Type = HashType;
-};
-
-
-template<typename HashTrait>
-void test_hash_func()
-{
-	string filename = string("hashcache_") + std::to_string(HashTrait::Size) + ".csv";
-	    fs::path hcPath = fs::current_path() / "data" / filename;
-	#ifdef TEST_DATA_DIR
-	    if (!fs::exists(hcPath))
-	    {
-	    	hcPath = fs::path(BOOST_PP_STRINGIZE(TEST_DATA_DIR)) / filename;
-	    }
-	#endif
-	    cout << hcPath.string() << endl;
-		ifstream hif(hcPath.string().c_str());
-		BOOST_REQUIRE_MESSAGE(hif.is_open(), "hash cache missing?");
-		if ( hif.is_open() )
-		{
-			char buffer[1024] = {0};
-			while(hif.getline(buffer, sizeof(buffer)))
-			{
-				string line = buffer;
-				auto index = line.find_first_of(',');
-				auto hashSource = line.substr(0, index), hashExpected = line.substr(index + 1);
-				if ( hashSource.size() == HashTrait::Size / 8 && hashExpected.size() == HashTrait::Size / 4 )
-				{
-					typename HashTrait::Type input;
-					typename HashTrait::Type hashRaw;
-					memcpy(&input, hashSource.c_str(), HashTrait::Size / 8);
-					HashTrait::compute(&hashRaw, input.b, HashTrait::Size / 8);
-					auto actual = toHex((uint8_t*)&hashRaw, HashTrait::Size / 8);
-					//cout << hashSource << "," << actual << endl;
-					BOOST_REQUIRE_MESSAGE(hashExpected == actual, "\nsource: " << hashSource << "\nexpected: " << hashExpected.c_str() << "\n" << "actual: " << actual.c_str() << "\n");
-				}
-			}
-		}
-}
-
-using HashTrait256 = HashTrait<egihash_h256_t, 256, egihash_h256_compute>;
-using HashTrait512 = HashTrait<egihash_h512_t, 512, egihash_h512_compute>;
-
-
-BOOST_AUTO_TEST_CASE(SHA3256) {
-	test_hash_func<HashTrait256>();
-}
-
-BOOST_AUTO_TEST_CASE(SHA3512) {
-	test_hash_func<HashTrait512>();
-}
-
-
-BOOST_AUTO_TEST_CASE(EGIHASH_HASHIMOTO)
-{
-	using namespace std;
-	using namespace egihash;
-
-	auto progress = [](::std::size_t step, ::std::size_t max, int phase) -> bool
+	bool dag_progress(::std::size_t step, ::std::size_t max, int phase)
 	{
 		switch(phase)
 		{
@@ -145,21 +70,98 @@ BOOST_AUTO_TEST_CASE(EGIHASH_HASHIMOTO)
 			default:
 				break;
 		}
+
 		cout << fixed << setprecision(2)
-		<< static_cast<double>(step) / static_cast<double>(max) * 100.0 << "%"
-		<< setfill(' ') << setw(80) << flush;
+			<< static_cast<double>(step) / static_cast<double>(max) * 100.0 << "%"
+			<< setfill(' ') << setw(80) << "\r" << endl;
 
 		return true;
 	};
 
+	std::string toHex(const uint8_t *streamBytes, const uint64_t size)
+	{
+		std::stringstream sHex;
+		for( uint64_t iter = 0; iter < size; ++iter )
+		{
+			sHex << std::nouppercase << std::hex << std::setw(2) << std::setfill('0') << static_cast<int>(streamBytes[iter]);
+		}
+		return sHex.str();
+	}
+
+	template <typename HashType
+	, size_t HashSize
+	, void (*Compute)(HashType * output_hash, void * input_data, uint64_t input_size)>
+	struct HashTrait
+	{
+		static constexpr size_t Size = HashSize;
+		static constexpr decltype(Compute) compute = Compute;
+		using Type = HashType;
+	};
+
+
+	template<typename HashTrait>
+	void test_hash_func()
+	{
+		string filename = string("hashcache_") + std::to_string(HashTrait::Size) + ".csv";
+		    fs::path hcPath = fs::current_path() / "data" / filename;
+		#ifdef TEST_DATA_DIR
+		    if (!fs::exists(hcPath))
+		    {
+		    	hcPath = fs::path(BOOST_PP_STRINGIZE(TEST_DATA_DIR)) / filename;
+		    }
+		#endif
+		    cout << hcPath.string() << endl;
+			ifstream hif(hcPath.string().c_str());
+			BOOST_REQUIRE_MESSAGE(hif.is_open(), "hash cache missing?");
+			if ( hif.is_open() )
+			{
+				char buffer[1024] = {0};
+				while(hif.getline(buffer, sizeof(buffer)))
+				{
+					string line = buffer;
+					auto index = line.find_first_of(',');
+					auto hashSource = line.substr(0, index), hashExpected = line.substr(index + 1);
+					if ( hashSource.size() == HashTrait::Size / 8 && hashExpected.size() == HashTrait::Size / 4 )
+					{
+						typename HashTrait::Type input;
+						typename HashTrait::Type hashRaw;
+						memcpy(&input, hashSource.c_str(), HashTrait::Size / 8);
+						HashTrait::compute(&hashRaw, input.b, HashTrait::Size / 8);
+						auto actual = toHex((uint8_t*)&hashRaw, HashTrait::Size / 8);
+						//cout << hashSource << "," << actual << endl;
+						BOOST_REQUIRE_MESSAGE(hashExpected == actual, "\nsource: " << hashSource << "\nexpected: " << hashExpected.c_str() << "\n" << "actual: " << actual.c_str() << "\n");
+					}
+				}
+			}
+	}
+}
+
+using HashTrait256 = HashTrait<egihash_h256_t, 256, egihash_h256_compute>;
+using HashTrait512 = HashTrait<egihash_h512_t, 512, egihash_h512_compute>;
+
+BOOST_AUTO_TEST_SUITE(TODO_name_a_test_suite);
+
+BOOST_AUTO_TEST_CASE(SHA3256) {
+	test_hash_func<HashTrait256>();
+}
+
+BOOST_AUTO_TEST_CASE(SHA3512) {
+	test_hash_func<HashTrait512>();
+}
+
+BOOST_AUTO_TEST_CASE(EGIHASH_HASHIMOTO)
+{
+	using namespace std;
+	using namespace egihash;
+
 	if (!boost::filesystem::exists( "data/egihash.dag" ))
 	{
 		std::cout << "data/egihash.dag does not exist yet! will be auto generated" << std::endl;
-		egihash::dag_t dag(0, progress);
+		egihash::dag_t dag(0, dag_progress);
 		dag.save("data/egihash.dag");
 	}
 
-	dag_t d("data/egihash.dag", progress);
+	dag_t d("data/egihash.dag", dag_progress);
 	cout << endl;
 
 	string rawdata("this is a test string to be hashed");
@@ -197,42 +199,7 @@ BOOST_AUTO_TEST_CASE(FULL_CLIENT)
 
 	if ( !boost::filesystem::exists( egiDagPath ) )
 	{
-		auto progress = [](::std::size_t step, ::std::size_t max, int phase) -> bool
-		{
-			switch(phase)
-			{
-				case egihash::cache_seeding:
-					cout << "Seeding cache..." << endl;
-					break;
-				case egihash::cache_generation:
-					cout << "Generating cache..." << endl;
-					break;
-				case egihash::cache_saving:
-					cout << "Saving cache..." << endl;
-					break;
-				case egihash::cache_loading:
-					cout << "Loading cache..." << endl;
-					break;
-				case egihash::dag_generation:
-					cout << "Generating DAG..." << endl;
-					break;
-				case egihash::dag_saving:
-					cout << "Saving DAG..." << endl;
-					break;
-				case egihash::dag_loading:
-					cout << "Loading DAG..." << endl;
-					break;
-				default:
-					break;
-			}
-
-			cout << fixed << setprecision(2)
-			<< static_cast<double>(step) / static_cast<double>(max) * 100.0 << "%"
-			<< setfill(' ') << setw(80) << flush;
-
-			return true;
-		};
-		egihash::dag_t dag(0, progress);
+		egihash::dag_t dag(0, dag_progress);
 		dag.save(egiDagPath.string());
 	}
 
@@ -283,49 +250,14 @@ BOOST_AUTO_TEST_CASE(light_hash_vs_full_hash_comparison)
 	using namespace std;
 	using namespace egihash;
 
-	auto progress = [](::std::size_t step, ::std::size_t max, int phase) -> bool
-	{
-		switch(phase)
-		{
-			case cache_seeding:
-				cout << "\rSeeding cache...";
-				break;
-			case cache_generation:
-				cout << "\rGenerating cache...";
-				break;
-			case cache_saving:
-				cout << "\rSaving cache...";
-				break;
-			case cache_loading:
-				cout << "\rLoading cache...";
-				break;
-			case dag_generation:
-				cout << "\rGenerating DAG...";
-				break;
-			case dag_saving:
-				cout << "\rSaving DAG...";
-				break;
-			case dag_loading:
-				cout << "\rLoading DAG...";
-				break;
-			default:
-				break;
-		}
-		cout << fixed << setprecision(2)
-		<< static_cast<double>(step) / static_cast<double>(max) * 100.0 << "%"
-		<< setfill(' ') << setw(80) << flush;
-
-		return true;
-	};
-
 	if (!boost::filesystem::exists( "data/egihash.dag" ))
 	{
 		std::cout << "data/egihash.dag does not exist yet! will be auto generated" << std::endl;
-		egihash::dag_t dag(0, progress);
+		egihash::dag_t dag(0, dag_progress);
 		dag.save("data/egihash.dag");
 	}
 
-	dag_t d("data/egihash.dag", progress);
+	dag_t d("data/egihash.dag", dag_progress);
 	cache_t c(d.get_cache());
 	cout << endl;
 
