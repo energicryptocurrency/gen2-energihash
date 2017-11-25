@@ -306,6 +306,8 @@ namespace
 
 namespace egihash
 {
+	constexpr h256_t::size_type h256_t::hash_size;
+
 	h256_t::h256_t(void const * input_data, size_type input_size)
 	: b{0}
 	{
