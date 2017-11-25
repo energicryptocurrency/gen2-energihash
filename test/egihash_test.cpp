@@ -270,9 +270,6 @@ BOOST_AUTO_TEST_CASE(light_hash_vs_full_hash_comparison)
 		firsthash = h256_t(&firsthash.b[0], firsthash.hash_size);
 		auto const lighthash = light::hash(c, firsthash, nonce);
 		auto const fullhash = full::hash(d, firsthash, nonce);
-		cout << "\r[" << toHex(&firsthash.b[0], firsthash.hash_size) << "," << nonce << "] -> "
-			<< "\"" << toHex(&lighthash.value.b[0], lighthash.value.hash_size) << "\" == \""
-			<< toHex(&fullhash.value.b[0], fullhash.value.hash_size) << "\"" << endl;
 
 		// check that the hashes are nonempty
 		BOOST_ASSERT(lighthash);
