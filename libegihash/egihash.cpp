@@ -817,7 +817,7 @@ namespace egihash
 		}
 
 		// TODO: this func needs to be made endian safe
-		auto read = [&fs, &read_buffer, &buffer_ptr, &buffer_ptr_end, &filesize](void * dst, size_type count)
+		auto read = [&fs, &read_buffer, &buffer_ptr, &buffer_ptr_end/*, &filesize*/](void * dst, size_type count)
 		{
 			// full buffer consumed exactly
 			if ((buffer_ptr_end - buffer_ptr) == 1)
