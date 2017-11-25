@@ -221,6 +221,12 @@ namespace egihash
 		*/
 		operator bool() const;
 
+		/** \brief Compare this h256_t to another h256_t.
+		*
+		*	\return true if the hashes are equal.
+		*/
+		bool operator==(h256_t const &) const;
+
 		/** \brief This member stores the 256-bit hash data
 		*/
 		uint8_t b[hash_size];
@@ -261,6 +267,12 @@ namespace egihash
 		/** \brief Test if this hash is valid. Returs true of hash data is not all 0 bytes.
 		*/
 		operator bool() const;
+
+		/** \brief Compare this result_t to another result_t.
+		*
+		*	\return true if both the value and mixhash are equal.
+		*/
+		bool operator==(result_t const &) const;
 
 		/** \brief This member contains the egihash result value.
 		*/

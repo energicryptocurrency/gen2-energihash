@@ -1,6 +1,6 @@
 /*
  ============================================================================
- Name        : test.c
+ Name        : egihash_test.cpp
  Author      : Ranjeet Devgun
  Version     :
  Copyright   : TODO Copyright notice
@@ -17,13 +17,10 @@
 #include <iomanip>
 #include "egihash.h"
 
-
 #ifdef _WIN32
 #include <windows.h>
 #include <Shlobj.h>
 #endif
-
-
 
 #include <iostream>
 #include <functional>
@@ -33,6 +30,8 @@
 #include <tuple>
 #include <random>
 #include <boost/filesystem.hpp>
+
+#define BOOST_TEST_MODULE libegihash_unit_tests
 #include <boost/test/unit_test.hpp>
 
 using namespace std;
@@ -40,85 +39,25 @@ using byte = uint8_t;
 using bytes = std::vector<byte>;
 namespace fs = boost::filesystem;
 
-
-std::string toHex(const uint8_t *streamBytes, const uint64_t size)
+namespace
 {
-	std::stringstream sHex;
-	for( uint64_t iter = 0; iter < size; ++iter )
+	bool dag_progress(::std::size_t step, ::std::size_t max, int phase)
 	{
-		sHex << std::nouppercase << std::hex << std::setw(2) << std::setfill('0') << static_cast<int>(streamBytes[iter]);
-	}
-	return sHex.str();
-}
+		using namespace egihash;
 
-template <typename HashType
-, size_t HashSize
-, void (*Compute)(HashType * output_hash, void * input_data, uint64_t input_size)>
-struct HashTrait
-{
-	static constexpr size_t Size = HashSize;
-	static constexpr decltype(Compute) compute = Compute;
-	using Type = HashType;
-};
-
-
-template<typename HashTrait>
-void test_hash_func()
-{
-	string filename = string("hashcache_") + std::to_string(HashTrait::Size) + ".csv";
-	    fs::path hcPath = fs::current_path() / "data" / filename;
-	#ifdef TEST_DATA_DIR
-	    if (!fs::exists(hcPath))
-	    {
-	    	hcPath = fs::path(BOOST_PP_STRINGIZE(TEST_DATA_DIR)) / filename;
-	    }
-	#endif
-	    cout << hcPath.string() << endl;
-		ifstream hif(hcPath.string().c_str());
-		BOOST_REQUIRE_MESSAGE(hif.is_open(), "hash cache missing?");
-		if ( hif.is_open() )
+		// saving output for longer running tasks like DAG generation
+		switch (phase)
 		{
-			char buffer[1024] = {0};
-			while(hif.getline(buffer, sizeof(buffer)))
-			{
-				string line = buffer;
-				auto index = line.find_first_of(',');
-				auto hashSource = line.substr(0, index), hashExpected = line.substr(index + 1);
-				if ( hashSource.size() == HashTrait::Size / 8 && hashExpected.size() == HashTrait::Size / 4 )
-				{
-					typename HashTrait::Type input;
-					typename HashTrait::Type hashRaw;
-					memcpy(&input, hashSource.c_str(), HashTrait::Size / 8);
-					HashTrait::compute(&hashRaw, input.b, HashTrait::Size / 8);
-					auto actual = toHex((uint8_t*)&hashRaw, HashTrait::Size / 8);
-					//cout << hashSource << "," << actual << endl;
-					BOOST_REQUIRE_MESSAGE(hashExpected == actual, "\nsource: " << hashSource << "\nexpected: " << hashExpected.c_str() << "\n" << "actual: " << actual.c_str() << "\n");
-				}
-			}
+			case cache_saving:
+			case cache_loading:
+			case dag_saving:
+			case dag_loading:
+				return true;
+			default:
+				break;
 		}
-}
 
-using HashTrait256 = HashTrait<egihash_h256_t, 256, egihash_h256_compute>;
-using HashTrait512 = HashTrait<egihash_h512_t, 512, egihash_h512_compute>;
-
-
-BOOST_AUTO_TEST_CASE(SHA3256) {
-	test_hash_func<HashTrait256>();
-}
-
-BOOST_AUTO_TEST_CASE(SHA3512) {
-	test_hash_func<HashTrait512>();
-}
-
-
-BOOST_AUTO_TEST_CASE(EGIHASH_HASHIMOTO)
-{
-	using namespace std;
-	using namespace egihash;
-
-	auto progress = [](::std::size_t step, ::std::size_t max, int phase) -> bool
-	{
-		switch(phase)
+		switch (phase)
 		{
 			case cache_seeding:
 				cout << "\rSeeding cache...";
@@ -144,22 +83,97 @@ BOOST_AUTO_TEST_CASE(EGIHASH_HASHIMOTO)
 			default:
 				break;
 		}
+
 		cout << fixed << setprecision(2)
-		<< static_cast<double>(step) / static_cast<double>(max) * 100.0 << "%"
-		<< setfill(' ') << setw(80) << flush;
+			<< static_cast<double>(step) / static_cast<double>(max) * 100.0 << "%"
+			<< setfill(' ') << setw(80) << flush;
+
+		if (step == max) cout << "\r" << endl;
 
 		return true;
 	};
 
+	std::string toHex(const uint8_t *streamBytes, const uint64_t size)
+	{
+		std::stringstream sHex;
+		for( uint64_t iter = 0; iter < size; ++iter )
+		{
+			sHex << std::nouppercase << std::hex << std::setw(2) << std::setfill('0') << static_cast<int>(streamBytes[iter]);
+		}
+		return sHex.str();
+	}
+
+	template <typename HashType
+	, size_t HashSize
+	, void (*Compute)(HashType * output_hash, void * input_data, uint64_t input_size)>
+	struct HashTrait
+	{
+		static constexpr size_t Size = HashSize;
+		static constexpr decltype(Compute) compute = Compute;
+		using Type = HashType;
+	};
+
+
+	template<typename HashTrait>
+	void test_hash_func()
+	{
+		string filename = string("hashcache_") + std::to_string(HashTrait::Size) + ".csv";
+		    fs::path hcPath = fs::current_path() / "data" / filename;
+		#ifdef TEST_DATA_DIR
+		    if (!fs::exists(hcPath))
+		    {
+		    	hcPath = fs::path(BOOST_PP_STRINGIZE(TEST_DATA_DIR)) / filename;
+		    }
+		#endif
+			ifstream hif(hcPath.string().c_str());
+			BOOST_REQUIRE_MESSAGE(hif.is_open(), "hash cache missing?");
+			if ( hif.is_open() )
+			{
+				char buffer[1024] = {0};
+				while(hif.getline(buffer, sizeof(buffer)))
+				{
+					string line = buffer;
+					auto index = line.find_first_of(',');
+					auto hashSource = line.substr(0, index), hashExpected = line.substr(index + 1);
+					if ( hashSource.size() == HashTrait::Size / 8 && hashExpected.size() == HashTrait::Size / 4 )
+					{
+						typename HashTrait::Type input;
+						typename HashTrait::Type hashRaw;
+						memcpy(&input, hashSource.c_str(), HashTrait::Size / 8);
+						HashTrait::compute(&hashRaw, input.b, HashTrait::Size / 8);
+						auto actual = toHex((uint8_t*)&hashRaw, HashTrait::Size / 8);
+						BOOST_REQUIRE_MESSAGE(hashExpected == actual, "\nsource: " << hashSource << "\nexpected: " << hashExpected.c_str() << "\n" << "actual: " << actual.c_str() << "\n");
+					}
+				}
+			}
+	}
+}
+
+using HashTrait256 = HashTrait<egihash_h256_t, 256, egihash_h256_compute>;
+using HashTrait512 = HashTrait<egihash_h512_t, 512, egihash_h512_compute>;
+
+BOOST_AUTO_TEST_SUITE(TODO_name_a_test_suite);
+
+BOOST_AUTO_TEST_CASE(SHA3256) {
+	test_hash_func<HashTrait256>();
+}
+
+BOOST_AUTO_TEST_CASE(SHA3512) {
+	test_hash_func<HashTrait512>();
+}
+
+BOOST_AUTO_TEST_CASE(EGIHASH_HASHIMOTO)
+{
+	using namespace std;
+	using namespace egihash;
+
 	if (!boost::filesystem::exists( "data/egihash.dag" ))
 	{
-		std::cout << "data/egihash.dag does not exist yet! will be auto generated" << std::endl;
-		egihash::dag_t dag(0, progress);
+		egihash::dag_t dag(0, dag_progress);
 		dag.save("data/egihash.dag");
 	}
 
-	dag_t d("data/egihash.dag", progress);
-	cout << endl;
+	dag_t d("data/egihash.dag", dag_progress);
 
 	string rawdata("this is a test string to be hashed");
 	std::vector<std::tuple<uint64_t, std::string, std::string>> vExpected = {
@@ -196,42 +210,7 @@ BOOST_AUTO_TEST_CASE(FULL_CLIENT)
 
 	if ( !boost::filesystem::exists( egiDagPath ) )
 	{
-		auto progress = [](::std::size_t step, ::std::size_t max, int phase) -> bool
-		{
-			switch(phase)
-			{
-				case egihash::cache_seeding:
-					cout << "Seeding cache..." << endl;
-					break;
-				case egihash::cache_generation:
-					cout << "Generating cache..." << endl;
-					break;
-				case egihash::cache_saving:
-					cout << "Saving cache..." << endl;
-					break;
-				case egihash::cache_loading:
-					cout << "Loading cache..." << endl;
-					break;
-				case egihash::dag_generation:
-					cout << "Generating DAG..." << endl;
-					break;
-				case egihash::dag_saving:
-					cout << "Saving DAG..." << endl;
-					break;
-				case egihash::dag_loading:
-					cout << "Loading DAG..." << endl;
-					break;
-				default:
-					break;
-			}
-
-			cout << fixed << setprecision(2)
-			<< static_cast<double>(step) / static_cast<double>(max) * 100.0 << "%"
-			<< setfill(' ') << setw(80) << flush;
-
-			return true;
-		};
-		egihash::dag_t dag(0, progress);
+		egihash::dag_t dag(0, dag_progress);
 		dag.save(egiDagPath.string());
 	}
 
@@ -253,7 +232,6 @@ BOOST_AUTO_TEST_CASE(FULL_CLIENT)
 
 		egiDagSizeSkip += egihash::cache_t::get_cache_size(0);
 
-		cout << egiDagSizeSkip << endl;
 		constexpr uint32_t BUFFER_SIZE = 32 * 1024 * 1024;
 		constexpr uint32_t DATA_TO_READ = 1024;
 		std::unique_ptr<uint8_t[]> buffer_eg (new uint8_t[BUFFER_SIZE]);
@@ -272,6 +250,52 @@ BOOST_AUTO_TEST_CASE(FULL_CLIENT)
 
 BOOST_AUTO_TEST_CASE(SEEDHASH_FILE_NAME_TEST)
 {
-	auto seedhash = egihash::get_seedhash(0);
-	std::cout << egihash::seedhash_to_filename(seedhash) << std::endl;
+	using namespace egihash;
+	BOOST_ASSERT(seedhash_to_filename(get_seedhash(0)) == "ffa8494bffb2ff895bffd7ffed18ffbb39ffb7ffb2ff8afff51dffec51fff7ffcaffd330ffc168fff1ffbd1cff90ffe7614c32");
 }
+
+// test that light hashes and full hashes produce the same values
+BOOST_AUTO_TEST_CASE(light_hash_vs_full_hash_comparison)
+{
+	using namespace std;
+	using namespace egihash;
+
+	if (!boost::filesystem::exists( "data/egihash.dag" ))
+	{
+		egihash::dag_t dag(0, dag_progress);
+		dag.save("data/egihash.dag");
+	}
+
+	dag_t d("data/egihash.dag", dag_progress);
+	cache_t c(d.get_cache());
+
+	string rawdata("this is a test string to be hashed");
+	h256_t firsthash(rawdata.c_str(), rawdata.size());
+
+	for (size_t i = 0; i < 1000; i++)
+	{
+		uint64_t nonce = (*reinterpret_cast<uint64_t *>(&firsthash.b[0])) ^ (*reinterpret_cast<uint64_t *>(&firsthash.b[16]));
+		firsthash = h256_t(&firsthash.b[0], firsthash.hash_size);
+		auto const lighthash = light::hash(c, firsthash, nonce);
+		auto const fullhash = full::hash(d, firsthash, nonce);
+
+		// check that the hashes are nonempty
+		BOOST_ASSERT(lighthash);
+		BOOST_ASSERT(fullhash);
+
+		// check the byte for byte value and the mixhash is the same for both light and full hashes
+		BOOST_ASSERT(memcmp(&lighthash.value.b[0], &fullhash.value.b[0], (std::min)(lighthash.value.hash_size, fullhash.value.hash_size)) == 0);
+		BOOST_ASSERT(memcmp(&lighthash.mixhash.b[0], &fullhash.mixhash.b[0], (std::min)(lighthash.value.hash_size, fullhash.value.hash_size)) == 0);
+
+		// checks operator== for egihash::h256_t
+		BOOST_ASSERT(lighthash.value == fullhash.value);
+		BOOST_ASSERT(lighthash.mixhash == fullhash.mixhash);
+
+		// checks operator== for egihash::result_t
+		BOOST_ASSERT(lighthash == fullhash);
+	}
+
+	d.unload();
+}
+
+BOOST_AUTO_TEST_SUITE_END();
