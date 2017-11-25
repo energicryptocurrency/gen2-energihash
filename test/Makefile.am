@@ -7,7 +7,7 @@ bin_PROGRAMS=egihash_test
 # Because a.out is only a sample program we don't want it to be installed.
 # The 'noinst_' prefix indicates that the following targets are not to be
 # installed.
-#noinst_PROGRAMS=test
+#noinst_PROGRAMS=egihash_test
 
 #######################################
 # Build information for each executable. The variable name is derived
@@ -17,8 +17,8 @@ bin_PROGRAMS=egihash_test
 
 ACLOCAL_AMFLAGS=-I ../m4
 
-# Sources for the a.out 
-test_SOURCES= test.cpp
+# Sources for the a.out
+test_SOURCES= egihash_test.cpp
 
 # Libraries for a.out
 test_LDADD = $(top_srcdir)/libegihash/libegihash.la
