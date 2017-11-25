@@ -320,9 +320,19 @@ namespace egihash
 		return (::std::memcmp(&b[0], &empty_h256.b[0], sizeof(b)) != 0);
 	}
 
+	bool h256_t::operator==(h256_t const & rhs) const
+	{
+		return (::std::memcmp(&b[0], &rhs.b[0], sizeof(b)) == 0);
+	}
+
 	result_t::operator bool() const
 	{
 		return bool(value) && bool(mixhash);
+	}
+
+	bool result_t::operator==(result_t const & rhs) const
+	{
+		return ((value == rhs.value) && (mixhash == rhs.mixhash));
 	}
 
 	// TODO: unit tests / validation
