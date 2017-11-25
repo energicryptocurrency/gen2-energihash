@@ -1,6 +1,6 @@
 /*
  ============================================================================
- Name        : test.c
+ Name        : egihash_test.cpp
  Author      : Ranjeet Devgun
  Version     :
  Copyright   : TODO Copyright notice
