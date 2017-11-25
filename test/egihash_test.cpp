@@ -17,13 +17,10 @@
 #include <iomanip>
 #include "egihash.h"
 
-
 #ifdef _WIN32
 #include <windows.h>
 #include <Shlobj.h>
 #endif
-
-
 
 #include <iostream>
 #include <functional>
@@ -33,6 +30,8 @@
 #include <tuple>
 #include <random>
 #include <boost/filesystem.hpp>
+
+#define BOOST_TEST_MODULE libegihash_unit_tests
 #include <boost/test/unit_test.hpp>
 
 using namespace std;
@@ -40,6 +39,8 @@ using byte = uint8_t;
 using bytes = std::vector<byte>;
 namespace fs = boost::filesystem;
 
+
+BOOST_AUTO_TEST_SUITE(TODO_name_a_test_suite);
 
 std::string toHex(const uint8_t *streamBytes, const uint64_t size)
 {
@@ -359,3 +360,5 @@ BOOST_AUTO_TEST_CASE(light_hash_vs_full_hash_comparison)
 
 	d.unload();
 }
+
+BOOST_AUTO_TEST_SUITE_END();
