@@ -13,7 +13,7 @@ dnl Initialize automake
 AM_INIT_AUTOMAKE([foreign])
 
 dnl this allows us specify individual liking flags for each target
-AM_PROG_CC_C_O 
+AM_PROG_CC_C_O
 
 dnl Initialize Libtool
 LT_INIT
