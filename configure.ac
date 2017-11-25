@@ -1,7 +1,7 @@
 dnl Process this file with autoconf to produce a configure script.
 
 AC_PREREQ([2.69])
-AC_INIT([egihash],[1.0])
+AC_INIT([egihash],[1.23.0])
 AC_PROG_CC
 AC_PROG_CXX
 
@@ -13,7 +13,7 @@ dnl Initialize automake
 AM_INIT_AUTOMAKE([foreign])
 
 dnl this allows us specify individual liking flags for each target
-AM_PROG_CC_C_O 
+AM_PROG_CC_C_O
 
 dnl Initialize Libtool
 LT_INIT
