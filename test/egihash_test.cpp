@@ -348,7 +348,7 @@ BOOST_AUTO_TEST_CASE(light_hash_vs_full_hash_comparison)
 
 		// check the byte for byte value and the mixhash is the same for both light and full hashes
 		BOOST_ASSERT(memcmp(&lighthash.value.b[0], &fullhash.value.b[0], (std::min)(lighthash.value.hash_size, fullhash.value.hash_size)) == 0);
-		BOOST_ASSERT(memcmp(&lighthash.mixhash.b[0], &fullhash.value.b[0], (std::min)(lighthash.value.hash_size, fullhash.value.hash_size)) == 0);
+		BOOST_ASSERT(memcmp(&lighthash.mixhash.b[0], &fullhash.mixhash.b[0], (std::min)(lighthash.value.hash_size, fullhash.value.hash_size)) == 0);
 
 		// checks operator== for egihash::h256_t
 		BOOST_ASSERT(lighthash.value == fullhash.value);
