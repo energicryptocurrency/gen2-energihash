@@ -228,6 +228,70 @@ namespace egihash
 	*/
 	static constexpr h256_t empty_h256;
 
+	/** \brief h512_t represents a the result of a keccak-512 hash.
+	*/
+	struct h512_t
+	{
+		using size_type = ::std::size_t;
+		static constexpr size_type hash_size = 64;
+
+		/** \brief Default constructor for h512_t fills data field b with 0 bytes
+		*/
+		constexpr h512_t(): b{0} {}
+
+		/** \brief Default copy constructor
+		*/
+		h512_t(h512_t const &) = default;
+
+		/** \brief Default copy assignment operator
+		*/
+		h512_t & operator=(h512_t const &) = default;
+
+		/** \brief Default move constructor
+		*/
+		h512_t(h512_t &&) = default;
+
+		/** \brief Default move assignment operator
+		*/
+		h512_t & operator=(h512_t &&) = default;
+
+		/** \brief Default destructor
+		*/
+		~h512_t() = default;
+
+		/** \brief Construct and compute a hash from a data source.
+		*
+		*	\param input_data A pointer to the start of the data to be hashed
+		*	\param input_size The number of bytes of input data to hash
+		*	\throws hash_exception on error
+		*/
+		h512_t(void const * input_data, size_type input_size);
+
+		/** \brief Get the hex-encoded value for this h512_t.
+		*
+		*	\returns std::string containing hex encoded value for this h512_t.
+		*/
+		::std::string to_hex() const;
+
+		/** \brief Test if this hash is valid. Returns true if hash data is not all 0 bytes.
+		*/
+		operator bool() const;
+
+		/** \brief Compare this h512_t to another h512_t.
+		*
+		*	\return true if the hashes are equal.
+		*/
+		bool operator==(h512_t const &) const;
+
+		/** \brief This member stores the 512-bit hash data
+		*/
+		uint8_t b[hash_size];
+	};
+
+	/** \brief A default constructed h512_t has all empty bytes.
+	*/
+	static constexpr h512_t empty_h512;
+
 	/** \brief result_t represents the result of an egihash.
 	*/
 	struct result_t
@@ -615,38 +679,4 @@ namespace egihash
 	}
 }
 
-extern "C"
-{
-#endif // __cplusplus
-
-#define EGIHASH_NAMESPACE_PREFIX egihash
-#define EGIHASH_CONCAT(x, y) EGIHASH_CONCAT_(x, y)
-#define EGIHASH_CONCAT_(x, y) x ## y
-#define EGIHASH_NAMESPACE(name) EGIHASH_NAMESPACE_(_ ## name)
-#define EGIHASH_NAMESPACE_(name) EGIHASH_CONCAT(EGIHASH_NAMESPACE_PREFIX, name)
-
-typedef int (* EGIHASH_NAMESPACE(callback))(unsigned int);
-typedef struct EGIHASH_NAMESPACE(light) * EGIHASH_NAMESPACE(light_t);
-typedef struct EGIHASH_NAMESPACE(full) * EGIHASH_NAMESPACE(full_t);
-typedef struct EGIHASH_NAMESPACE(h256) { uint8_t b[32]; } EGIHASH_NAMESPACE(h256_t);
-typedef struct EGIHASH_NAMESPACE(result) { EGIHASH_NAMESPACE(h256_t) value; EGIHASH_NAMESPACE(h256_t) mixhash; } EGIHASH_NAMESPACE(result_t);
-typedef struct EGIHASH_NAMESPACE(h512) { uint8_t b[64]; } EGIHASH_NAMESPACE(h512_t);
-
-#if 0 // TODO: FIXME
-EGIHASH_NAMESPACE(light_t) EGIHASH_NAMESPACE(light_new)(unsigned int block_number);
-EGIHASH_NAMESPACE(result_t) EGIHASH_NAMESPACE(light_compute)(EGIHASH_NAMESPACE(light_t) light, EGIHASH_NAMESPACE(h256_t) header_hash, uint64_t nonce);
-void EGIHASH_NAMESPACE(light_delete)(EGIHASH_NAMESPACE(light_t) light);
-
-EGIHASH_NAMESPACE(full_t) EGIHASH_NAMESPACE(full_new)(EGIHASH_NAMESPACE(light_t) light, EGIHASH_NAMESPACE(callback) callback);
-uint64_t EGIHASH_NAMESPACE(full_dag_size)(EGIHASH_NAMESPACE(full_t) full);
-void const * EGIHASH_NAMESPACE(full_dag)(EGIHASH_NAMESPACE(full_t) full);
-EGIHASH_NAMESPACE(result_t) EGIHASH_NAMESPACE(full_compute)(EGIHASH_NAMESPACE(full_t) full, EGIHASH_NAMESPACE(h256_t) header_hash, uint64_t nonce);
-void EGIHASH_NAMESPACE(full_delete)(EGIHASH_NAMESPACE(full_t) full);
-#endif
-
-void egihash_h256_compute(EGIHASH_NAMESPACE(h256_t) * output_hash, void * input_data, uint64_t input_size);
-void egihash_h512_compute(EGIHASH_NAMESPACE(h512_t) * output_hash, void * input_data, uint64_t input_size);
-
-#ifdef __cplusplus
-} // extern "C"
 #endif // __cplusplus
