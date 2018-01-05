@@ -93,31 +93,10 @@ namespace
 		return true;
 	};
 
-	std::string toHex(const uint8_t *streamBytes, const uint64_t size)
-	{
-		std::stringstream sHex;
-		for( uint64_t iter = 0; iter < size; ++iter )
-		{
-			sHex << std::nouppercase << std::hex << std::setw(2) << std::setfill('0') << static_cast<int>(streamBytes[iter]);
-		}
-		return sHex.str();
-	}
-
-	template <typename HashType
-	, size_t HashSize
-	, void (*Compute)(HashType * output_hash, void * input_data, uint64_t input_size)>
-	struct HashTrait
-	{
-		static constexpr size_t Size = HashSize;
-		static constexpr decltype(Compute) compute = Compute;
-		using Type = HashType;
-	};
-
-
-	template<typename HashTrait>
+	template<typename HashType>
 	void test_hash_func()
 	{
-		string filename = string("hashcache_") + std::to_string(HashTrait::Size) + ".csv";
+		string filename = string("hashcache_") + std::to_string(HashType::hash_size * 8) + ".csv";
 		    fs::path hcPath = fs::current_path() / "data" / filename;
 		#ifdef TEST_DATA_DIR
 		    if (!fs::exists(hcPath))
@@ -130,37 +109,38 @@ namespace
 			if ( hif.is_open() )
 			{
 				char buffer[1024] = {0};
+				size_t lineCount = 1;
 				while(hif.getline(buffer, sizeof(buffer)))
 				{
 					string line = buffer;
 					auto index = line.find_first_of(',');
 					auto hashSource = line.substr(0, index), hashExpected = line.substr(index + 1);
-					if ( hashSource.size() == HashTrait::Size / 8 && hashExpected.size() == HashTrait::Size / 4 )
-					{
-						typename HashTrait::Type input;
-						typename HashTrait::Type hashRaw;
-						memcpy(&input, hashSource.c_str(), HashTrait::Size / 8);
-						HashTrait::compute(&hashRaw, input.b, HashTrait::Size / 8);
-						auto actual = toHex((uint8_t*)&hashRaw, HashTrait::Size / 8);
-						BOOST_REQUIRE_MESSAGE(hashExpected == actual, "\nsource: " << hashSource << "\nexpected: " << hashExpected.c_str() << "\n" << "actual: " << actual.c_str() << "\n");
-					}
+					BOOST_REQUIRE_MESSAGE(hashSource.size() == HashType::hash_size, "\ninvalid hash source at line: " << lineCount);
+					BOOST_REQUIRE_MESSAGE(hashExpected.size() == (HashType::hash_size * 2), "\ninvalid expected hash entry at line: " << lineCount);
+					auto actual = HashType(hashSource.c_str(), hashSource.length()).to_hex();
+					BOOST_REQUIRE_MESSAGE(hashExpected == actual, "\nsource: " << hashSource << "\nexpected: " << hashExpected.c_str() << "\n" << "actual: " << actual.c_str() << "\n");
+					lineCount++;
 				}
 			}
 	}
 }
 
-using HashTrait256 = HashTrait<egihash_h256_t, 256, egihash_h256_compute>;
-using HashTrait512 = HashTrait<egihash_h512_t, 512, egihash_h512_compute>;
+BOOST_AUTO_TEST_SUITE(Keccak);
 
-BOOST_AUTO_TEST_SUITE(TODO_name_a_test_suite);
-
-BOOST_AUTO_TEST_CASE(SHA3256) {
-	test_hash_func<HashTrait256>();
+BOOST_AUTO_TEST_CASE(Keccak_256)
+{
+	test_hash_func<egihash::h256_t>();
 }
 
-BOOST_AUTO_TEST_CASE(SHA3512) {
-	test_hash_func<HashTrait512>();
+BOOST_AUTO_TEST_CASE(Keccak_512)
+{
+	test_hash_func<egihash::h512_t>();
 }
+
+BOOST_AUTO_TEST_SUITE_END();
+
+
+BOOST_AUTO_TEST_SUITE(Egihash);
 
 BOOST_AUTO_TEST_CASE(EGIHASH_HASHIMOTO)
 {
@@ -187,8 +167,8 @@ BOOST_AUTO_TEST_CASE(EGIHASH_HASHIMOTO)
 		for(auto i = 0; i < 2; ++i)
 		{
 			auto const h = i == 0 ? full::hash(d, h256_t(rawdata.c_str(), rawdata.size()), std::get<0>(expected)) : light::hash(d.get_cache(), h256_t(rawdata.c_str(), rawdata.size()), std::get<0>(expected));
-			auto const value_str = toHex(h.value.b, h.value.hash_size);
-			auto const mix_str = toHex(h.mixhash.b, h.mixhash.hash_size);
+			auto const value_str = h.value.to_hex();
+			auto const mix_str = h.mixhash.to_hex();
 			BOOST_CHECK_MESSAGE(value_str == std::get<1>(expected), "\nnounce=" << std::get<0>(expected) << "\nactual=" << value_str << "\nexpected=" << std::get<1>(expected));
 			BOOST_CHECK_MESSAGE(mix_str == std::get<2>(expected), "\nnounce=" << std::get<0>(expected) << "\nactual=" << mix_str << "\nexpected=" << std::get<2>(expected));
 		}
@@ -196,7 +176,6 @@ BOOST_AUTO_TEST_CASE(EGIHASH_HASHIMOTO)
 
 	d.unload();
 }
-
 
 BOOST_AUTO_TEST_CASE(FULL_CLIENT)
 {
@@ -248,10 +227,14 @@ BOOST_AUTO_TEST_CASE(FULL_CLIENT)
 	}
 }
 
-BOOST_AUTO_TEST_CASE(SEEDHASH_FILE_NAME_TEST)
+BOOST_AUTO_TEST_CASE(seedhash_test)
 {
 	using namespace egihash;
 	BOOST_ASSERT(cache_t::get_seedhash(0).to_hex() == "a8494bb2895bd7ed18bb39b7b28af51dec51f7cad330c168f1bd1c90e7614c32");
+	//for (size_t i = 0; i < 100; i++)
+	//{
+	//	std::cout << cache_t::get_seedhash(i).to_hex() << std::endl;
+	//}
 }
 
 // test that light hashes and full hashes produce the same values
