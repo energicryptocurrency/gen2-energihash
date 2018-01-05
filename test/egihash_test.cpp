@@ -251,7 +251,7 @@ BOOST_AUTO_TEST_CASE(FULL_CLIENT)
 BOOST_AUTO_TEST_CASE(SEEDHASH_FILE_NAME_TEST)
 {
 	using namespace egihash;
-	BOOST_ASSERT(seedhash_to_filename(get_seedhash(0)) == "ffa8494bffb2ff895bffd7ffed18ffbb39ffb7ffb2ff8afff51dffec51fff7ffcaffd330ffc168fff1ffbd1cff90ffe7614c32");
+	BOOST_ASSERT(cache_t::get_seedhash(0).to_hex() == "a8494bb2895bd7ed18bb39b7b28af51dec51f7cad330c168f1bd1c90e7614c32");
 }
 
 // test that light hashes and full hashes produce the same values

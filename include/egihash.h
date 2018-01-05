@@ -164,20 +164,6 @@ namespace egihash
 	static constexpr uint8_t size_epoch0_seedhash = sizeof(epoch0_seedhash) - 1;
 	static_assert(size_epoch0_seedhash == 32, "Invalid seedhash");
 
-	/** \brief get_seedhash(uint64_t) will compute the seedhash for a given block number.
-	*
-	*	\param block_number An unsigned 64-bit integer representing the block number for which to compute the seed hash.
-	*	\return A hexidecimal encoded keccak-256 seed hash for the given block number.
-	*/
-	::std::string get_seedhash(uint64_t const block_number);
-
-	/** \brief function to provide readable dag file name
-	*
-	*	\param A hexidecimal encoded keccak-256 seed hash for the given block number.
-	*	\return A readable filename
-	*/
-	std::string seedhash_to_filename(const std::string &seedhash);
-
 	/** \brief h256_t represents a the result of a keccak-256 hash.
 	*/
 	struct h256_t
@@ -216,6 +202,12 @@ namespace egihash
 		*	\throws hash_exception on error
 		*/
 		h256_t(void const * input_data, size_type input_size);
+
+		/** \brief Get the hex-encoded value for this h256_t.
+		*
+		*	\returns std::string containing hex encoded value for this h256_t.
+		*/
+		::std::string to_hex() const;
 
 		/** \brief Test if this hash is valid. Returns true if hash data is not all 0 bytes.
 		*/
@@ -362,7 +354,7 @@ namespace egihash
 		*	\param seed is the seed hash (i.e. get_seedhash(block_number)) for which this cache_t is to be constructed.
 		*	\param callback (optional) may be used to monitor the progress of cache generation. Return false to cancel, true to continue.
 		*/
-		cache_t(uint64_t block_number, ::std::string const & seed, progress_callback_type callback = [](size_type, size_type, int){ return true; });
+		cache_t(uint64_t block_number, progress_callback_type callback = [](size_type, size_type, int){ return true; });
 
 		/** \brief Get the epoch number for which this cache is valid.
 		*
@@ -382,12 +374,25 @@ namespace egihash
 		*/
 		data_type const & data() const;
 
+		/** \brief Get the seedhash for this cache.
+		*
+		*	/returns h256_t seed hash for this cache.
+		*/
+		h256_t seedhash() const;
+
 		/** \brief Get the size of the cache data in bytes.
 		*
 		*	\param block_number is the block number for which cache size to compute.
 		*	\returns size_type representing the size of the cache data in bytes.
 		*/
 		static size_type get_cache_size(uint64_t const block_number) noexcept;
+
+		/** \brief get_seedhash(uint64_t) will compute the seedhash for a given block number.
+		*
+		*	\param block_number An unsigned 64-bit integer representing the block number for which to compute the seed hash.
+		*	\return An h256_t keccak-256 seed hash for the given block number.
+		*/
+		static h256_t get_seedhash(uint64_t const block_number);
 
 		/** \brief cache_t internal implementation.
 		*/
