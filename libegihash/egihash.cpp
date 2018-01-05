@@ -167,9 +167,10 @@ namespace
 	struct sha3_base
 	{
 		using deserialized_hash_t = ::std::vector<node>;
+		using size_type = ::std::size_t;
 
-		static constexpr size_t hash_size = HashSize;
-		static constexpr size_t data_size = HashSize / sizeof(node);
+		static constexpr size_type hash_size = HashSize;
+		static constexpr size_type data_size = HashSize / sizeof(node);
 		deserialized_hash_t data;
 
 		sha3_base(sha3_base const &) = default;
@@ -190,13 +191,13 @@ namespace
 			compute_hash(input.c_str(), input.size());
 		}
 
-		sha3_base(void const * input, size_t const input_size)
+		sha3_base(void const * input, size_type const input_size)
 		:sha3_base()
 		{
 			compute_hash(input, input_size);
 		}
 
-		inline void compute_hash(void const * input, size_t const input_size)
+		inline void compute_hash(void const * input, size_type const input_size)
 		{
 			if (HashFunction(reinterpret_cast<uint8_t*>(data.data()), hash_size, reinterpret_cast<uint8_t const *>(input), input_size) != 0)
 			{
@@ -236,7 +237,7 @@ namespace
 
 		}
 
-		sha3_256_t(void const * input, size_t const input_size)
+		sha3_256_t(void const * input, size_type const input_size)
 		: sha3_base(input, input_size)
 		{
 
@@ -257,7 +258,7 @@ namespace
 
 		}
 
-		sha3_512_t(void const * input, size_t const input_size)
+		sha3_512_t(void const * input, size_type const input_size)
 		: sha3_base(input, input_size)
 		{
 
@@ -269,6 +270,12 @@ namespace
 	typename HashType::deserialized_hash_t hash_words(::std::string const & data)
 	{
 		return HashType(data).data;
+	}
+
+	template <typename HashType, typename DataType>
+	typename HashType::deserialized_hash_t hash_words(DataType * data_ptr, typename HashType::size_type data_size)
+	{
+		return HashType(data_ptr, data_size).data;
 	}
 
 	// TODO: unit tests / validation
@@ -317,6 +324,19 @@ namespace egihash
 		}
 	}
 
+	::std::string h256_t::to_hex() const
+	{
+		// TODO: fast hex conversion
+		::std::stringstream ss;
+		ss << ::std::hex << ::std::nouppercase;
+		uint8_t const * iEnd = reinterpret_cast<uint8_t const *>(&b[hash_size]);
+		for (uint8_t const * i = reinterpret_cast<uint8_t const *>(&b[0]); i != iEnd; i++)
+		{
+			ss << ::std::setw(2) << ::std::setfill('0') << static_cast<uint16_t>(*i);
+		}
+		return ss.str();
+	}
+
 	h256_t::operator bool() const
 	{
 		return (::std::memcmp(&b[0], &empty_h256.b[0], sizeof(b)) != 0);
@@ -344,11 +364,23 @@ namespace egihash
 		return hash_words<sha3_512_t>(data);
 	}
 
+	template <typename DataPtr>
+	sha3_512_t::deserialized_hash_t sha3_512(DataPtr const * data, sha3_512_t::size_type data_size)
+	{
+		return hash_words<sha3_512_t>(data, data_size);
+	}
+
 	// TODO: unit tests / validation
 	template <typename T>
 	sha3_256_t::deserialized_hash_t sha3_256(T const & data)
 	{
 		return hash_words<sha3_256_t>(data);
+	}
+
+	template <typename DataPtr>
+	sha3_256_t::deserialized_hash_t sha3_256(DataPtr const * data, sha3_256_t::size_type data_size)
+	{
+		return hash_words<sha3_256_t>(data, data_size);
 	}
 
 	// TODO: unit tests / validation
@@ -370,57 +402,36 @@ namespace egihash
 		return serialize_cache(dataset);
 	}
 
-	// TODO: unit tests / validation
-	::std::string get_seedhash(uint64_t const block_number)
-	{
-		::std::string s(epoch0_seedhash, size_epoch0_seedhash);
-		for (size_t i = 0; i < (block_number / constants::EPOCH_LENGTH); i++)
-		{
-			s = sha3_256_t::serialize(sha3_256(s));
-		}
-		return s;
-	}
-
-	std::string seedhash_to_filename(const std::string &seedhash)
-	{
-		std::stringstream ss;
-		ss << std::hex << std::nouppercase;
-		for (auto const i : seedhash)
-		{
-			ss << std::setfill('0') << std::setw(2)  << static_cast<uint16_t>(i);
-		}
-		return ss.str();
-	}
-
-
 	struct cache_t::impl_t
 	{
 		using size_type = cache_t::size_type;
 		using data_type = ::std::vector<std::vector<node>>;
 		using cache_cache_map = ::std::map<uint64_t /* epoch */, ::std::shared_ptr<impl_t>>;
 
-		impl_t(uint64_t const block_number, ::std::string const & seed, progress_callback_type callback)
+		impl_t(uint64_t const block_number, progress_callback_type callback)
 		: epoch(block_number / constants::EPOCH_LENGTH)
+		, seedhash(get_seedhash(block_number))
 		, size(get_cache_size(block_number))
 		, data()
 		{
-			mkcache(seed, callback);
+			mkcache(callback);
 		}
 
 		impl_t(uint64_t epoch, uint64_t size, read_function_type read, progress_callback_type callback)
 		: epoch(epoch)
+		, seedhash(get_seedhash((epoch * constants::EPOCH_LENGTH) + 1))
 		, size(size)
 		, data()
 		{
 			load(read, callback);
 		}
 
-		void mkcache(::std::string const & seed, progress_callback_type callback)
+		void mkcache(progress_callback_type callback)
 		{
 			uint32_t n = size / constants::HASH_BYTES;
 
 			data.reserve(n);
-			data.push_back(sha3_512(seed));
+			data.push_back(sha3_512(&seedhash.b[0], seedhash.hash_size));
 			for (uint32_t i = 1; i < n; i++)
 			{
 				data.push_back(sha3_512(data.back()));
@@ -483,7 +494,20 @@ namespace egihash
 			return cache_size;
 		}
 
+		static h256_t get_seedhash(uint64_t const block_number)
+		{
+			::std::string s(epoch0_seedhash, size_epoch0_seedhash);
+			for (size_t i = 0; i < (block_number / constants::EPOCH_LENGTH); i++)
+			{
+				s = sha3_256_t::serialize(sha3_256(s));
+			}
+			h256_t ret;
+			::std::memcpy(&ret.b[0], s.c_str(), (std::min)(ret.hash_size, s.length()));
+			return ret;
+		}
+
 		uint64_t epoch;
+		h256_t seedhash;
 		size_type size;
 		data_type data;
 	};
@@ -507,7 +531,7 @@ namespace egihash
 	// ensures single threaded construction
 	cache_t::impl_t::cache_cache_map & cache_cache = get_cache_cache();
 
-	::std::shared_ptr<cache_t::impl_t> get_cache_from_cache(uint64_t const block_number, ::std::string const & seed, progress_callback_type callback)
+	::std::shared_ptr<cache_t::impl_t> get_cache_from_cache(uint64_t const block_number, progress_callback_type callback)
 	{
 		using namespace std;
 		uint64_t epoch_number = block_number / constants::EPOCH_LENGTH;
@@ -524,7 +548,7 @@ namespace egihash
 
 		// otherwise create the cache and add it to the cache cache
 		// this is not locked as it can be a lengthy process and we don't want to block access to the cache cache
-		shared_ptr<cache_t::impl_t> impl(new cache_t::impl_t(block_number, seed, callback));
+		shared_ptr<cache_t::impl_t> impl(new cache_t::impl_t(block_number, callback));
 
 		lock_guard<recursive_mutex> lock(get_cache_cache_mutex());
 		auto insert_pair = get_cache_cache().insert(make_pair(epoch_number, impl));
@@ -546,8 +570,8 @@ namespace egihash
 		throw hash_exception("Could not get cache");
 	}
 
-	cache_t::cache_t(uint64_t const block_number, ::std::string const & seed, progress_callback_type callback)
-	: impl(get_cache_from_cache(block_number, seed, callback))
+	cache_t::cache_t(uint64_t const block_number, progress_callback_type callback)
+	: impl(get_cache_from_cache(block_number, callback))
 	{
 	}
 
@@ -571,6 +595,11 @@ namespace egihash
 		return impl->data;
 	}
 
+	h256_t cache_t::seedhash() const
+	{
+		return impl->seedhash;
+	}
+
 	void cache_t::load(read_function_type read, progress_callback_type callback)
 	{
 		impl->load(read, callback);
@@ -579,6 +608,11 @@ namespace egihash
 	cache_t::size_type cache_t::get_cache_size(uint64_t const block_number) noexcept
 	{
 		return impl_t::get_cache_size(block_number);
+	}
+
+	h256_t cache_t::get_seedhash(uint64_t const block_number)
+	{
+		return impl_t::get_seedhash(block_number);
 	}
 
 	struct dag_t::impl_t
@@ -591,7 +625,7 @@ namespace egihash
 		impl_t(uint64_t block_number, progress_callback_type callback)
 		: epoch(block_number / constants::EPOCH_LENGTH)
 		, size(get_full_size(block_number))
-		, cache(block_number, get_seedhash(block_number), callback)
+		, cache(block_number, callback)
 		, data()
 		{
 			generate(callback);
