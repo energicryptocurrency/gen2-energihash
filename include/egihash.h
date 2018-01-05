@@ -100,10 +100,6 @@ namespace egihash
 		/** \brief The number of DAG lookups to compute an egihash.
 		*/
 		static constexpr uint32_t ACCESSES = 64u;
-
-		// TODO: C API
-		//static constexpr EGIHASH_NAMESPACE(h256_t) empty_h256 = {{0}};
-		//static constexpr EGIHASH_NAMESPACE(result_t) empty_result = {{{0}}, {{0}}};
 	}
 
 	/** \brief node union is used instead of the native integer to allow both bytes level access and as a 4 byte hash word
@@ -157,7 +153,6 @@ namespace egihash
 	/** \brief epoch0_seedhash is is the seed hash for the genesis block and first epoch of the DAG.
 	*			All seed hashes for subsequent epochs will be generated from this seedhash.
 	*
-	*	The epoch0_seedhash should be set to a randomized set of 32 bytes for a given crypto currency.
 	*	This represents a keccak-256 hash that will be used as input for building the DAG/cache.
 	*/
 	static constexpr char epoch0_seedhash[] = "\xa8\x49\x4b\xb2\x89\x5b\xd7\xed\x18\xbb\x39\xb7\xb2\x8a\xf5\x1d\xec\x51\xf7\xca\xd3\x30\xc1\x68\xf1\xbd\x1c\x90\xe7\x61\x4c\x32";
@@ -412,10 +407,9 @@ namespace egihash
 		*/
 		cache_t() = delete;
 
-		/** \brief Construct a cache_t given a block number, a seed hash, and a progress callback function.
+		/** \brief Construct a cache_t given a block number and a progress callback function.
 		*
 		*	\param block_number is the block number for which this cache_t is to be constructed.
-		*	\param seed is the seed hash (i.e. get_seedhash(block_number)) for which this cache_t is to be constructed.
 		*	\param callback (optional) may be used to monitor the progress of cache generation. Return false to cancel, true to continue.
 		*/
 		cache_t(uint64_t block_number, progress_callback_type callback = [](size_type, size_type, int){ return true; });
