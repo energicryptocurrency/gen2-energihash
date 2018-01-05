@@ -242,12 +242,6 @@ namespace
 		{
 
 		}
-
-		sha3_256_t(EGIHASH_NAMESPACE(h256_t) const & h256)
-		: sha3_base()
-		{
-			::std::memcpy(reinterpret_cast<uint8_t*>(data.data()), &h256.b[0], hash_size);
-		}
 	};
 
 	struct sha3_512_t : public sha3_base<64, ::sha3_512>
@@ -343,6 +337,40 @@ namespace egihash
 	}
 
 	bool h256_t::operator==(h256_t const & rhs) const
+	{
+		return (::std::memcmp(&b[0], &rhs.b[0], sizeof(b)) == 0);
+	}
+
+	constexpr h512_t::size_type h512_t::hash_size;
+
+	h512_t::h512_t(void const * input_data, size_type input_size)
+	: b{0}
+	{
+		if (::sha3_512(b, hash_size, reinterpret_cast<uint8_t const *>(input_data), input_size) != 0)
+		{
+			throw hash_exception("Keccak-512 computation failed.");
+		}
+	}
+
+	::std::string h512_t::to_hex() const
+	{
+		// TODO: fast hex conversion
+		::std::stringstream ss;
+		ss << ::std::hex << ::std::nouppercase;
+		uint8_t const * iEnd = reinterpret_cast<uint8_t const *>(&b[hash_size]);
+		for (uint8_t const * i = reinterpret_cast<uint8_t const *>(&b[0]); i != iEnd; i++)
+		{
+			ss << ::std::setw(2) << ::std::setfill('0') << static_cast<uint16_t>(*i);
+		}
+		return ss.str();
+	}
+
+	h512_t::operator bool() const
+	{
+		return (::std::memcmp(&b[0], &empty_h512.b[0], sizeof(b)) != 0);
+	}
+
+	bool h512_t::operator==(h512_t const & rhs) const
 	{
 		return (::std::memcmp(&b[0], &rhs.b[0], sizeof(b)) == 0);
 	}
@@ -1317,184 +1345,4 @@ namespace egihash
 
 		return result;
 	}
-}
-
-extern "C"
-{
-	#if 0 // TODO: FIXME
-	struct EGIHASH_NAMESPACE(light)
-	{
-		unsigned int block_number;
-		::egihash::cache_t cache;
-
-		EGIHASH_NAMESPACE(light)(unsigned int block_number)
-		: block_number(block_number)
-		, cache(block_number, ::egihash::get_seedhash(block_number))
-		{
-
-		}
-
-		EGIHASH_NAMESPACE(result_t) compute(EGIHASH_NAMESPACE(h256_t) header_hash, uint64_t nonce)
-		{
-			// TODO: copy-free version
-			EGIHASH_NAMESPACE(result_t) result;
-			auto ret = ::egihash::hashimoto_light(get_full_size(block_number), cache.data(), sha3_256_t(header_hash).deserialize(), nonce);
-			auto const & val = ret["result"];
-			auto const & mix = ret["mix hash"];
-			::std::memcpy(result.value.b, &(*val)[0], sizeof(result.value.b));
-			::std::memcpy(result.mixhash.b, &(*mix)[0], sizeof(result.mixhash.b));
-			return result;
-		}
-	};
-
-	struct EGIHASH_NAMESPACE(full)
-	{
-		EGIHASH_NAMESPACE(light_t) light;
-		::std::vector<sha3_512_t::deserialized_hash_t> dataset;
-
-		EGIHASH_NAMESPACE(full)(EGIHASH_NAMESPACE(light_t) light, EGIHASH_NAMESPACE(callback) callback)
-		: light(light)
-		, dataset()//TODO::egihash::calc_dataset(light->cache, get_full_size(light->block_number), callback))
-		{
-			(void)callback;//TODO
-		}
-
-		EGIHASH_NAMESPACE(result_t) compute(EGIHASH_NAMESPACE(h256_t) header_hash, uint64_t nonce)
-		{
-			// TODO: copy free version
-			// TODO: validate memset sizes i.e. min(sizeof(dest), sizeof(src))
-			EGIHASH_NAMESPACE(result_t) result;
-			auto ret = ::egihash::hashimoto_full(get_full_size(light->block_number), dataset, sha3_256_t(header_hash).deserialize(), nonce);
-			auto const & val = ret["result"];
-			auto const & mix = ret["mix hash"];
-			::std::memcpy(result.value.b, &(*val)[0], sizeof(result.value.b));
-			::std::memcpy(result.mixhash.b, &(*mix)[0], sizeof(result.mixhash.b));
-			return result;
-		}
-	};
-
-	EGIHASH_NAMESPACE(light_t) EGIHASH_NAMESPACE(light_new)(unsigned int block_number)
-	{
-		try
-		{
-			return new EGIHASH_NAMESPACE(light)(block_number);
-		}
-		catch (...)
-		{
-			return 0; // nullptr return indicates error
-		}
-	}
-
-	EGIHASH_NAMESPACE(result_t) EGIHASH_NAMESPACE(light_compute)(EGIHASH_NAMESPACE(light_t) light, EGIHASH_NAMESPACE(h256_t) header_hash, uint64_t nonce)
-	{
-		try
-		{
-			return light->compute(header_hash, nonce);
-		}
-		catch (...)
-		{
-			return constants::empty_result; // empty result indicates error
-		}
-	}
-
-	void EGIHASH_NAMESPACE(light_delete)(EGIHASH_NAMESPACE(light_t) light)
-	{
-		try
-		{
-			delete light;
-		}
-		catch (...)
-		{
-			// no way to indicate error
-		}
-	}
-
-	EGIHASH_NAMESPACE(full_t) EGIHASH_NAMESPACE(full_new)(EGIHASH_NAMESPACE(light_t) light, EGIHASH_NAMESPACE(callback) callback)
-	{
-		try
-		{
-			return new EGIHASH_NAMESPACE(full)(light, callback);
-		}
-		catch (...)
-		{
-			return 0; // nullptr indicates error
-		}
-	}
-
-	uint64_t EGIHASH_NAMESPACE(full_dag_size)(EGIHASH_NAMESPACE(full_t) full)
-	{
-		try
-		{
-			return get_full_size(full->light->block_number);
-		}
-		catch (...)
-		{
-			return 0; // zero result indicates error
-		}
-	}
-
-	void const * EGIHASH_NAMESPACE(full_dag)(EGIHASH_NAMESPACE(full_t) full)
-	{
-		try
-		{
-			return &full->dataset[0];
-		}
-		catch (...)
-		{
-			return 0; // nullptr indicates error
-		}
-	}
-
-	EGIHASH_NAMESPACE(result_t) EGIHASH_NAMESPACE(full_compute)(EGIHASH_NAMESPACE(full_t) full, EGIHASH_NAMESPACE(h256_t) header_hash, uint64_t nonce)
-	{
-		try
-		{
-			return full->compute(header_hash, nonce);
-		}
-		catch (...)
-		{
-			return constants::empty_result; // empty result indicates error
-		}
-	}
-
-	void EGIHASH_NAMESPACE(full_delete)(EGIHASH_NAMESPACE(full_t) full)
-	{
-		try
-		{
-			delete full;
-		}
-		catch (...)
-		{
-			// no way to indicate error
-		}
-	}
-#endif
-	void egihash_h256_compute(EGIHASH_NAMESPACE(h256_t) * output_hash, void * input_data, uint64_t input_size)
-	{
-		try
-		{
-			sha3_256_t hash(input_data, input_size);
-			::std::memcpy(output_hash->b, reinterpret_cast<const char*>(hash.data.data()), hash.hash_size);
-		}
-		catch (...)
-		{
-			// zero hash data indicates error
-			::std::memset(output_hash->b, 0, 32);
-		}
-	}
-
-	void egihash_h512_compute(EGIHASH_NAMESPACE(h512_t) * output_hash, void * input_data, uint64_t input_size)
-	{
-		try
-		{
-			sha3_512_t hash(input_data, input_size);
-			::std::memcpy(output_hash->b, reinterpret_cast<const char*>(hash.data.data()), hash.hash_size);
-		}
-		catch (...)
-		{
-			// zero hash data indicates error
-			::std::memset(output_hash->b, 0, 64);
-		}
-	}
-
 }
