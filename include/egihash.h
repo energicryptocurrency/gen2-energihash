@@ -585,6 +585,19 @@ namespace egihash
 		*/
 		static size_type get_full_size(uint64_t const block_number) noexcept;
 
+		/** \brief Determine whether the DAG for this epoch is already loaded
+		*
+		*	\param epoch is the epoch number for which to determine if a DAG is already loaded.
+		*	\return bool true if we have this DAG epoch loaded, false otherwise.
+		*/
+		static bool is_loaded(uint64_t const epoch);
+
+		/** \brief Get the epoch numbers for which we already have a DAG loaded.
+		*
+		*	\return ::std::vector containing epoch numbers for DAGs that are already loaded.
+		*/
+		static ::std::vector<uint64_t> get_loaded();
+
 		/** \brief dag_t private implementation.
 		*/
 		struct impl_t;
