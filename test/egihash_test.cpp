@@ -455,4 +455,57 @@ BOOST_AUTO_TEST_CASE(dag_cache)
 	BOOST_ASSERT(success);
 }
 
+// test loading from the the cache cache as well as unloading
+BOOST_AUTO_TEST_CASE(cache_cache)
+{
+	using namespace std;
+	using namespace egihash;
+
+	cache_t c1(0, dag_progress);
+
+	bool success = true;
+	auto already_loaded = [&success](::std::size_t /*step*/, ::std::size_t /*max*/, int /*phase*/) -> bool
+	{
+		// if we have to load, we already failed because this dag should be loaded
+		success = false;
+		return false;
+	};
+
+	// ensure we don't try to load a cache again when it is already loaded
+	cache_t c2(0, already_loaded);
+	try
+	{
+		BOOST_REQUIRE_MESSAGE(success, "Attempt to re-load already loaded cache_t - should be retrieved from cache cache");
+	}
+	catch (hash_exception const &)
+	{
+		// ignored exception - we cancelled loading so we expect this
+	}
+	BOOST_ASSERT(cache_t::is_loaded(0));
+	BOOST_ASSERT(cache_t::get_loaded().size() == 1);
+	//c1.unload();
+	BOOST_ASSERT(!cache_t::is_loaded(0));
+	BOOST_ASSERT(cache_t::get_loaded().size() == 0);
+	success=false;
+
+	// ensure that after unloading, we would require re-loading this DAG
+	auto not_loaded = [&success](::std::size_t /*step*/, ::std::size_t /*max*/, int /*phase*/) -> bool
+	{
+		success = true;
+		return false;
+	};
+	try
+	{
+		cache_t c3(0, not_loaded);
+		BOOST_REQUIRE_MESSAGE(success, "Unloaded DAG was not re-loaded correctly");
+	}
+	catch (hash_exception const &)
+	{
+		// ignored exception - we cancelled loading so we expect this
+	}
+	BOOST_ASSERT(!cache_t::is_loaded(0));
+	BOOST_ASSERT(cache_t::get_loaded().size() == 0);
+	BOOST_ASSERT(success);
+}
+
 BOOST_AUTO_TEST_SUITE_END();
