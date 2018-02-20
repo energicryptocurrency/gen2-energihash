@@ -440,8 +440,8 @@ namespace egihash
 
 		/** \brief Unload cache.
 		*
-		*	To actually free a cachce from memory, call this function on a cache.
-		*   The cache will then be released from the internal cache.
+		*	To actually free a cache from memory, call this function on a cache.
+		*	The cache will then be released from the internal cache.
 		*	Once all references to the cache for this epoch are destroyed, it will be freed.
 		*/
 		void unload() const;
