@@ -428,7 +428,11 @@ BOOST_AUTO_TEST_CASE(dag_cache)
 	{
 		// ignored exception - we cancelled loading so we expect this
 	}
+	BOOST_ASSERT(dag_t::is_loaded(0));
+	BOOST_ASSERT(dag_t::get_loaded().size() == 1);
 	d1.unload();
+	BOOST_ASSERT(!dag_t::is_loaded(0));
+	BOOST_ASSERT(dag_t::get_loaded().size() == 0);
 	success=false;
 
 	// ensure that after unloading, we would require re-loading this DAG
@@ -446,6 +450,8 @@ BOOST_AUTO_TEST_CASE(dag_cache)
 	{
 		// ignored exception - we cancelled loading so we expect this
 	}
+	BOOST_ASSERT(!dag_t::is_loaded(0));
+	BOOST_ASSERT(dag_t::get_loaded().size() == 0);
 	BOOST_ASSERT(success);
 }
 
