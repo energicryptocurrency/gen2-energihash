@@ -400,4 +400,53 @@ BOOST_AUTO_TEST_CASE(light_hash_vs_full_hash_comparison)
 	d.unload();
 }
 
+// test loading from the the dag cache as well as unloading
+BOOST_AUTO_TEST_CASE(dag_cache)
+{
+	using namespace std;
+	using namespace egihash;
+
+	BOOST_REQUIRE_MESSAGE(boost::filesystem::exists("data/egihash.dag"), "DAG file not generated yet. Please re-run test case.");
+
+	dag_t d1("data/egihash.dag", dag_progress);
+
+	bool success = true;
+	auto already_loaded = [&success](::std::size_t /*step*/, ::std::size_t /*max*/, int /*phase*/) -> bool
+	{
+		// if we have to load, we already failed because this dag should be loaded
+		success = false;
+		return false;
+	};
+
+	// ensure we don't try to load a DAG again when it is already loaded
+	dag_t d2("data/egihash.dag", already_loaded);
+	try
+	{
+		BOOST_REQUIRE_MESSAGE(success, "Attempt to re-load already loaded DAG - should be retrieved from DAG cache");
+	}
+	catch (hash_exception const &)
+	{
+		// ignored exception - we cancelled loading so we expect this
+	}
+	d1.unload();
+	success=false;
+
+	// ensure that after unloading, we would require re-loading this DAG
+	auto not_loaded = [&success](::std::size_t /*step*/, ::std::size_t /*max*/, int /*phase*/) -> bool
+	{
+		success = true;
+		return false;
+	};
+	try
+	{
+		dag_t d3("data/egihash.dag", not_loaded);
+		BOOST_REQUIRE_MESSAGE(success, "Unloaded DAG was not re-loaded correctly");
+	}
+	catch (hash_exception const &)
+	{
+		// ignored exception - we cancelled loading so we expect this
+	}
+	BOOST_ASSERT(success);
+}
+
 BOOST_AUTO_TEST_SUITE_END();
