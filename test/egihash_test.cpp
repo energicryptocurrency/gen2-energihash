@@ -483,7 +483,7 @@ BOOST_AUTO_TEST_CASE(cache_cache)
 	}
 	BOOST_ASSERT(cache_t::is_loaded(0));
 	BOOST_ASSERT(cache_t::get_loaded().size() == 1);
-	//c1.unload();
+	c1.unload();
 	BOOST_ASSERT(!cache_t::is_loaded(0));
 	BOOST_ASSERT(cache_t::get_loaded().size() == 0);
 	success=false;

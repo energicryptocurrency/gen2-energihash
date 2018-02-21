@@ -205,7 +205,7 @@ namespace
 			}
 		}
 
- 		inline deserialized_hash_t deserialize() const
+		inline deserialized_hash_t deserialize() const
 		{
 			return data;
 		}
@@ -558,6 +558,11 @@ namespace egihash
 	}
 	// ensures single threaded construction
 	cache_t::impl_t::cache_cache_map & cache_cache = get_cache_cache();
+
+	void cache_t::unload() const
+	{
+		get_cache_cache().erase(epoch());
+	}
 
 	::std::shared_ptr<cache_t::impl_t> get_cache_from_cache(uint64_t const block_number, progress_callback_type callback)
 	{
@@ -1031,6 +1036,7 @@ namespace egihash
 		{
 			throw hash_exception("Can not unload DAG - not loaded.");
 		}
+		get_cache().unload();
 	}
 
 	dag_t::size_type dag_t::get_full_size(uint64_t const block_number) noexcept
