@@ -285,6 +285,7 @@ BOOST_AUTO_TEST_CASE(headerhashes)
 			auto const mixhash = HashFromHex(tokens[4]);
 
 			auto const cache = cache_t(epoch * constants::EPOCH_LENGTH);
+			caches.push_back(cache);
 
 			// make sure hex conversion is behaving sensibly
 			BOOST_REQUIRE_MESSAGE(headerhash.to_hex() == tokens[1], "hash hex conversion failed");
@@ -297,6 +298,10 @@ BOOST_AUTO_TEST_CASE(headerhashes)
 			BOOST_CHECK_MESSAGE(resulthash == actual.value, "Hash value comparison failed (expected " << resulthash.to_hex() << " got " << actual.value.to_hex() << ")");
 			BOOST_CHECK_MESSAGE(mixhash == actual.mixhash, "Mix hash comparison failed (expected " << mixhash.to_hex() << " got " << actual.mixhash.to_hex() << ")");
 			BOOST_CHECK_MESSAGE(expected == actual, "Hash result comparison failed");
+		}
+		for (auto && i: caches)
+		{
+			i.unload();
 		}
 	}
 }
