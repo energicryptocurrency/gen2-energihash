@@ -272,6 +272,7 @@ BOOST_AUTO_TEST_CASE(headerhashes)
 	if ( hif.is_open() )
 	{
 		string line;
+		vector<cache_t> caches;
 		while (getline(hif, line))
 		{
 			//string line = buffer;
