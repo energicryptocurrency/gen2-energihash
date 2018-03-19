@@ -1,7 +1,7 @@
 dnl Process this file with autoconf to produce a configure script.
 
 AC_PREREQ([2.69])
-AC_INIT([egihash],[1.23.0])
+AC_INIT([nrghash],[1.23.0])
 AC_PROG_CC
 AC_PROG_CXX
 
@@ -36,7 +36,7 @@ CCFLAGS="$BOOST_CCFLAGS -O3 -Wall -Wextra -Werror -Wno-unused-function"
 
 AC_CONFIG_FILES(Makefile
                 test/Makefile
-                libegihash/Makefile
+                libnrghash/Makefile
                 include/Makefile)
 AC_OUTPUT
 

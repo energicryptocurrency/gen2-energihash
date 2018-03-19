@@ -30,7 +30,7 @@
 *.exe
 *.out
 *.app
-/egihash
+/nrghash
 
 # Autotools files
 *.deps

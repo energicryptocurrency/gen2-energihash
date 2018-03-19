@@ -2,12 +2,12 @@
 # The list of executables we are building seperated by spaces
 # the 'bin_' indicates that these build products will be installed
 # in the $(bindir) directory. For example /usr/bin
-#bin_PROGRAMS=egihash_test
+#bin_PROGRAMS=nrghash_test
 
 # Because a.out is only a sample program we don't want it to be installed.
 # The 'noinst_' prefix indicates that the following targets are not to be
 # installed.
-noinst_PROGRAMS=egihash_test
+noinst_PROGRAMS=nrghash_test
 
 #######################################
 # Build information for each executable. The variable name is derived
@@ -18,13 +18,13 @@ noinst_PROGRAMS=egihash_test
 ACLOCAL_AMFLAGS=-I ../m4
 
 # Sources for the a.out
-egihash_test_SOURCES= egihash_test.cpp
+nrghash_test_SOURCES= nrghash_test.cpp
 
 # Libraries for a.out
-egihash_test_LDADD = $(top_srcdir)/libegihash/libegihash.la
+nrghash_test_LDADD = $(top_srcdir)/libnrghash/libnrghash.la
 
 # Linker options for a.out
-egihash_test_LDFLAGS = -rpath `cd $(top_srcdir);pwd`/libegihash/.libs $(BOOST_UNIT_TEST_FRAMEWORK_LIB)
+nrghash_test_LDFLAGS = -rpath `cd $(top_srcdir);pwd`/libnrghash/.libs $(BOOST_UNIT_TEST_FRAMEWORK_LIB)
 
 # Compiler options for a.out
-egihash_test_CPPFLAGS = -I$(top_srcdir)/include -DBOOST_TEST_DYN_LINK -DBOOST_TEST_MAIN
+nrghash_test_CPPFLAGS = -I$(top_srcdir)/include -DBOOST_TEST_DYN_LINK -DBOOST_TEST_MAIN

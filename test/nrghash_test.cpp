@@ -1,12 +1,12 @@
 /*
  ============================================================================
- Name        : egihash_test.cpp
+ Name        : nrghash_test.cpp
  Author      : Ranjeet Devgun
  Version     :
  Copyright   : TODO Copyright notice
  Description : Uses shared library to print greeting
 			   To run the resulting executable the LD_LIBRARY_PATH must be
-			   set to ${project_loc}/libegihash/.libs
+			   set to ${project_loc}/libnrghash/.libs
 			   Alternatively, libtool creates a wrapper shell script in the
 			   build directory of this program which can be used to run it.
 			   Here the script will be called test.
@@ -15,7 +15,7 @@
 
 #include <cstdint>
 #include <iomanip>
-#include "egihash.h"
+#include "nrghash.h"
 
 #ifdef _WIN32
 #include <windows.h>
@@ -32,7 +32,7 @@
 #include <boost/filesystem.hpp>
 #include <boost/tokenizer.hpp>
 
-#define BOOST_TEST_MODULE libegihash_unit_tests
+#define BOOST_TEST_MODULE libnrghash_unit_tests
 #include <boost/test/unit_test.hpp>
 
 using namespace std;
@@ -44,7 +44,7 @@ namespace
 {
 	bool dag_progress(::std::size_t step, ::std::size_t max, int phase)
 	{
-		using namespace egihash;
+		using namespace nrghash;
 
 		// saving output for longer running tasks like DAG generation
 		switch (phase)
@@ -125,9 +125,9 @@ namespace
 			}
 	}
 
-	egihash::h256_t HashFromHex(std::string const & hex)
+	nrghash::h256_t HashFromHex(std::string const & hex)
 	{
-		using namespace egihash;
+		using namespace nrghash;
 		h256_t ret;
 		for (size_t i = 0; i < 32; i++)
 		{
@@ -143,12 +143,12 @@ BOOST_AUTO_TEST_SUITE(Keccak);
 
 BOOST_AUTO_TEST_CASE(Keccak_256)
 {
-	test_hash_func<egihash::h256_t>();
+	test_hash_func<nrghash::h256_t>();
 }
 
 BOOST_AUTO_TEST_CASE(Keccak_512)
 {
-	test_hash_func<egihash::h512_t>();
+	test_hash_func<nrghash::h512_t>();
 }
 
 BOOST_AUTO_TEST_SUITE_END();
@@ -159,15 +159,15 @@ BOOST_AUTO_TEST_SUITE(Egihash);
 BOOST_AUTO_TEST_CASE(EGIHASH_HASHIMOTO)
 {
 	using namespace std;
-	using namespace egihash;
+	using namespace nrghash;
 
-	if (!boost::filesystem::exists( "data/egihash.dag" ))
+	if (!boost::filesystem::exists( "data/nrghash.dag" ))
 	{
-		egihash::dag_t dag(0, dag_progress);
-		dag.save("data/egihash.dag");
+		nrghash::dag_t dag(0, dag_progress);
+		dag.save("data/nrghash.dag");
 	}
 
-	dag_t d("data/egihash.dag", dag_progress);
+	dag_t d("data/nrghash.dag", dag_progress);
 
 	string rawdata("this is a test string to be hashed");
 	std::vector<std::tuple<uint64_t, std::string, std::string>> vExpected = {
@@ -193,17 +193,17 @@ BOOST_AUTO_TEST_CASE(EGIHASH_HASHIMOTO)
 
 BOOST_AUTO_TEST_CASE(FULL_CLIENT)
 {
-	string filename_egi = string("egihash.dag");
+	string filename_egi = string("nrghash.dag");
 	string filename_et = string("ethash_eg_seed_2_hashes.dag");
 	fs::path egiDagPath = fs::current_path() / "data" / filename_egi;
 	fs::path etDagPath = fs::current_path() / "data" / filename_et;
 
-	BOOST_ASSERT(16776896 == egihash::cache_t::get_cache_size(0));
-	BOOST_ASSERT(1073739904 == egihash::dag_t::get_full_size(0));
+	BOOST_ASSERT(16776896 == nrghash::cache_t::get_cache_size(0));
+	BOOST_ASSERT(1073739904 == nrghash::dag_t::get_full_size(0));
 
 	if ( !boost::filesystem::exists( egiDagPath ) )
 	{
-		egihash::dag_t dag(0, dag_progress);
+		nrghash::dag_t dag(0, dag_progress);
 		dag.save(egiDagPath.string());
 	}
 
@@ -213,17 +213,17 @@ BOOST_AUTO_TEST_CASE(FULL_CLIENT)
 	BOOST_ASSERT(dag_ethash_if.is_open() && dag_eghash_if.is_open());
 	if ( dag_ethash_if.is_open() && dag_eghash_if.is_open() )
 	{
-		uint64_t egiDagSizeSkip = sizeof(egihash::constants::DAG_MAGIC_BYTES) +
-					sizeof(egihash::constants::MAJOR_VERSION) +
-					sizeof(egihash::constants::REVISION) +
-					sizeof(egihash::constants::MINOR_VERSION) +
+		uint64_t egiDagSizeSkip = sizeof(nrghash::constants::DAG_MAGIC_BYTES) +
+					sizeof(nrghash::constants::MAJOR_VERSION) +
+					sizeof(nrghash::constants::REVISION) +
+					sizeof(nrghash::constants::MINOR_VERSION) +
 					sizeof(uint64_t) + // epoch
 					sizeof(uint64_t) + // cache begin
 					sizeof(uint64_t) + // cache_end
 					sizeof(uint64_t) + // dag_begin
 					sizeof(uint64_t);// dag_end
 
-		egiDagSizeSkip += egihash::cache_t::get_cache_size(0);
+		egiDagSizeSkip += nrghash::cache_t::get_cache_size(0);
 
 		constexpr uint32_t BUFFER_SIZE = 32 * 1024 * 1024;
 		constexpr uint32_t DATA_TO_READ = 1024;
@@ -244,7 +244,7 @@ BOOST_AUTO_TEST_CASE(FULL_CLIENT)
 BOOST_AUTO_TEST_CASE(headerhashes)
 {
 	using namespace std;
-	using namespace egihash;
+	using namespace nrghash;
 
 	string filename = string("headerhash_test_vectors.csv");
 	fs::path hcPath = fs::current_path() / "data" / filename;
@@ -308,7 +308,7 @@ BOOST_AUTO_TEST_CASE(headerhashes)
 
 BOOST_AUTO_TEST_CASE(seedhash_test)
 {
-	using namespace egihash;
+	using namespace nrghash;
 
 	static constexpr char const * first100_seedhashes[] =
 	{
@@ -439,23 +439,24 @@ BOOST_AUTO_TEST_CASE(seedhash_test)
 BOOST_AUTO_TEST_CASE(light_hash_vs_full_hash_comparison)
 {
 	using namespace std;
-	using namespace egihash;
+	using namespace nrghash;
 
-	if (!boost::filesystem::exists( "data/egihash.dag" ))
+	if (!boost::filesystem::exists( "data/nrghash.dag" ))
 	{
-		egihash::dag_t dag(0, dag_progress);
-		dag.save("data/egihash.dag");
+		nrghash::dag_t dag(0, dag_progress);
+		dag.save("data/nrghash.dag");
 	}
 
-	dag_t d("data/egihash.dag", dag_progress);
+	dag_t d("data/nrghash.dag", dag_progress);
 	cache_t c(d.get_cache());
 
 	string rawdata("this is a test string to be hashed");
 	h256_t firsthash(rawdata.c_str(), rawdata.size());
 
+    typedef int64_t __attribute__((__may_alias__)) int64_type;
 	for (size_t i = 0; i < 1000; i++)
 	{
-		uint64_t nonce = (*reinterpret_cast<uint64_t *>(&firsthash.b[0])) ^ (*reinterpret_cast<uint64_t *>(&firsthash.b[16]));
+		uint64_t nonce = (*reinterpret_cast<int64_type *>(&firsthash.b[0])) ^ (*reinterpret_cast<int64_type *>(&firsthash.b[16]));
 		firsthash = h256_t(&firsthash.b[0], firsthash.hash_size);
 		auto const lighthash = light::hash(c, firsthash, nonce);
 		auto const fullhash = full::hash(d, firsthash, nonce);
@@ -468,11 +469,11 @@ BOOST_AUTO_TEST_CASE(light_hash_vs_full_hash_comparison)
 		BOOST_ASSERT(memcmp(&lighthash.value.b[0], &fullhash.value.b[0], (std::min)(lighthash.value.hash_size, fullhash.value.hash_size)) == 0);
 		BOOST_ASSERT(memcmp(&lighthash.mixhash.b[0], &fullhash.mixhash.b[0], (std::min)(lighthash.value.hash_size, fullhash.value.hash_size)) == 0);
 
-		// checks operator== for egihash::h256_t
+		// checks operator== for nrghash::h256_t
 		BOOST_ASSERT(lighthash.value == fullhash.value);
 		BOOST_ASSERT(lighthash.mixhash == fullhash.mixhash);
 
-		// checks operator== for egihash::result_t
+		// checks operator== for nrghash::result_t
 		BOOST_ASSERT(lighthash == fullhash);
 	}
 
@@ -483,11 +484,11 @@ BOOST_AUTO_TEST_CASE(light_hash_vs_full_hash_comparison)
 BOOST_AUTO_TEST_CASE(dag_cache)
 {
 	using namespace std;
-	using namespace egihash;
+	using namespace nrghash;
 
-	BOOST_REQUIRE_MESSAGE(boost::filesystem::exists("data/egihash.dag"), "DAG file not generated yet. Please re-run test case.");
+	BOOST_REQUIRE_MESSAGE(boost::filesystem::exists("data/nrghash.dag"), "DAG file not generated yet. Please re-run test case.");
 
-	dag_t d1("data/egihash.dag", dag_progress);
+	dag_t d1("data/nrghash.dag", dag_progress);
 
 	bool success = true;
 	auto already_loaded = [&success](::std::size_t /*step*/, ::std::size_t /*max*/, int /*phase*/) -> bool
@@ -498,7 +499,7 @@ BOOST_AUTO_TEST_CASE(dag_cache)
 	};
 
 	// ensure we don't try to load a DAG again when it is already loaded
-	dag_t d2("data/egihash.dag", already_loaded);
+	dag_t d2("data/nrghash.dag", already_loaded);
 	try
 	{
 		BOOST_REQUIRE_MESSAGE(success, "Attempt to re-load already loaded DAG - should be retrieved from DAG cache");
@@ -522,7 +523,7 @@ BOOST_AUTO_TEST_CASE(dag_cache)
 	};
 	try
 	{
-		dag_t d3("data/egihash.dag", not_loaded);
+		dag_t d3("data/nrghash.dag", not_loaded);
 		BOOST_REQUIRE_MESSAGE(success, "Unloaded DAG was not re-loaded correctly");
 	}
 	catch (hash_exception const &)
@@ -538,7 +539,7 @@ BOOST_AUTO_TEST_CASE(dag_cache)
 BOOST_AUTO_TEST_CASE(cache_cache)
 {
 	using namespace std;
-	using namespace egihash;
+	using namespace nrghash;
 
 	cache_t c1(0, dag_progress);
 

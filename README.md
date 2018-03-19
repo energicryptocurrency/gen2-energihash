@@ -1,2 +1,2 @@
-# egihash
+# nrghash
 Energi cryptocurrency hash algorithm

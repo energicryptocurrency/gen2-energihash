@@ -1,2 +1,2 @@
-SUBDIRS=libegihash include test
+SUBDIRS=libnrghash include test
 ACLOCAL_AMFLAGS=-I m4
