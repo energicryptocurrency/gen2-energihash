@@ -5,11 +5,11 @@
  Version     :
  Copyright   : TODO Copyright notice
  Description : Uses shared library to print greeting
-               To run the resulting executable the LD_LIBRARY_PATH must be
-               set to ${project_loc}/libegihash/.libs
-               Alternatively, libtool creates a wrapper shell script in the
-               build directory of this program which can be used to run it.
-               Here the script will be called test.
+			   To run the resulting executable the LD_LIBRARY_PATH must be
+			   set to ${project_loc}/libegihash/.libs
+			   Alternatively, libtool creates a wrapper shell script in the
+			   build directory of this program which can be used to run it.
+			   Here the script will be called test.
  ============================================================================
  */
 
@@ -30,6 +30,7 @@
 #include <tuple>
 #include <random>
 #include <boost/filesystem.hpp>
+#include <boost/tokenizer.hpp>
 
 #define BOOST_TEST_MODULE libegihash_unit_tests
 #include <boost/test/unit_test.hpp>
@@ -97,12 +98,12 @@ namespace
 	void test_hash_func()
 	{
 		string filename = string("hashcache_") + std::to_string(HashType::hash_size * 8) + ".csv";
-		    fs::path hcPath = fs::current_path() / "data" / filename;
+			fs::path hcPath = fs::current_path() / "data" / filename;
 		#ifdef TEST_DATA_DIR
-		    if (!fs::exists(hcPath))
-		    {
-		    	hcPath = fs::path(BOOST_PP_STRINGIZE(TEST_DATA_DIR)) / filename;
-		    }
+			if (!fs::exists(hcPath))
+			{
+				hcPath = fs::path(BOOST_PP_STRINGIZE(TEST_DATA_DIR)) / filename;
+			}
 		#endif
 			ifstream hif(hcPath.string().c_str());
 			BOOST_REQUIRE_MESSAGE(hif.is_open(), "hash cache missing?");
@@ -122,6 +123,19 @@ namespace
 					lineCount++;
 				}
 			}
+	}
+
+	egihash::h256_t HashFromHex(std::string const & hex)
+	{
+		using namespace egihash;
+		h256_t ret;
+		for (size_t i = 0; i < 32; i++)
+		{
+			auto const ptr = hex.c_str();
+			char hexpair[] = { ptr[i*2], ptr[i*2 + 1] };
+			ret.b[i] = static_cast<uint8_t>(stoi(hexpair, nullptr, 16));
+		}
+		return ret;
 	}
 }
 
@@ -224,6 +238,71 @@ BOOST_AUTO_TEST_CASE(FULL_CLIENT)
 		BOOST_ASSERT(eg_read == et_read);
 		BOOST_ASSERT( ( dag_eghash_if.eof() && dag_ethash_if.eof()) || ( !dag_eghash_if.eof()&& !dag_ethash_if.eof() ) );
 		BOOST_ASSERT( 0 == ::std::memcmp(buffer_et.get(), buffer_eg.get(), eg_read) );
+	}
+}
+
+BOOST_AUTO_TEST_CASE(headerhashes)
+{
+	using namespace std;
+	using namespace egihash;
+
+	string filename = string("headerhash_test_vectors.csv");
+	fs::path hcPath = fs::current_path() / "data" / filename;
+#ifdef TEST_DATA_DIR
+	if (!fs::exists(hcPath))
+	{
+		hcPath = fs::path(BOOST_PP_STRINGIZE(TEST_DATA_DIR)) / filename;
+	}
+#endif
+	ifstream hif(hcPath.string().c_str());
+	BOOST_REQUIRE_MESSAGE(hif.is_open(), "Can not read data file headerhash_test_vectors.csv");
+
+	auto tokenize_line = [](std::string const & line) -> std::vector<std::string>
+	{
+		using namespace boost;
+		std::vector<std::string> vec;
+		tokenizer<escaped_list_separator<char> > tk(line, escaped_list_separator<char>('\\', ',', '\"'));
+		for (tokenizer<escaped_list_separator<char> >::iterator i(tk.begin());i!=tk.end();++i)
+		{
+			vec.push_back(*i);
+		}
+		return vec;
+	};
+
+	if ( hif.is_open() )
+	{
+		string line;
+		vector<cache_t> caches;
+		while (getline(hif, line))
+		{
+			//string line = buffer;
+			auto const tokens = tokenize_line(line);
+			BOOST_ASSERT(tokens.size() == 5);
+			auto const epoch = static_cast<unsigned int>(stoi(tokens[0].c_str()));
+			auto const headerhash = HashFromHex(tokens[1]);
+			auto const nonce = static_cast<unsigned int>(stoi(tokens[2].c_str()));
+			auto const resulthash = HashFromHex(tokens[3]);
+			auto const mixhash = HashFromHex(tokens[4]);
+
+			auto const cache = cache_t(epoch * constants::EPOCH_LENGTH);
+			caches.push_back(cache);
+
+			// make sure hex conversion is behaving sensibly
+			BOOST_REQUIRE_MESSAGE(headerhash.to_hex() == tokens[1], "hash hex conversion failed");
+
+			result_t expected;
+			expected.value = resulthash;
+			expected.mixhash = mixhash;
+
+			result_t const actual = light::hash(cache, headerhash, nonce);
+			BOOST_CHECK_MESSAGE(resulthash == actual.value, "Hash value comparison failed (expected " << resulthash.to_hex() << " got " << actual.value.to_hex() << ")");
+			BOOST_CHECK_MESSAGE(mixhash == actual.mixhash, "Mix hash comparison failed (expected " << mixhash.to_hex() << " got " << actual.mixhash.to_hex() << ")");
+			BOOST_CHECK_MESSAGE(expected == actual, "Hash result comparison failed");
+		}
+		for (auto && i: caches)
+		{
+			i.unload();
+		}
 	}
 }
 
